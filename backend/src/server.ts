@@ -37,7 +37,6 @@ if (env.NODE_ENV === "development") {
 }
 
 // Static files (uploaded resumes)
-<<<<<<< HEAD
 // Use /tmp/uploads on Vercel, local UPLOAD_DIR in development
 const uploadDir = process.env.VERCEL ? "/tmp/uploads" : path.resolve(env.UPLOAD_DIR);
 app.use("/uploads", express.static(uploadDir));
@@ -51,9 +50,6 @@ app.get("/", (_req, res) => {
     docs: "/api",
   });
 });
-=======
-app.use("/uploads", express.static(path.resolve(env.UPLOAD_DIR)));
->>>>>>> 81ef5bf1eb288139a17513bbf167f4ff33326c7c
 
 // API Routes
 app.use("/api", routes);
@@ -61,17 +57,11 @@ app.use("/api", routes);
 // Error handling
 app.use(errorHandler);
 
-<<<<<<< HEAD
 // Start server only in non-serverless environments
 // Vercel manages the server lifecycle itself via the exported app
 if (!process.env.VERCEL) {
   app.listen(env.PORT, () => {
     console.log(`
-=======
-// Start server
-app.listen(env.PORT, () => {
-  console.log(`
->>>>>>> 81ef5bf1eb288139a17513bbf167f4ff33326c7c
   ╔══════════════════════════════════════════════╗
   ║     AI Resume Analyzer - Backend API         ║
   ╠══════════════════════════════════════════════╣
@@ -79,13 +69,8 @@ app.listen(env.PORT, () => {
   ║  Port:        ${String(env.PORT).padEnd(30)}║
   ║  API URL:     http://localhost:${String(env.PORT).padEnd(17)}║
   ╚══════════════════════════════════════════════╝
-<<<<<<< HEAD
     `);
   });
 }
-=======
-  `);
-});
->>>>>>> 81ef5bf1eb288139a17513bbf167f4ff33326c7c
 
 export default app;

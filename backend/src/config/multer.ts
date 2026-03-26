@@ -3,7 +3,6 @@ import path from "path";
 import fs from "fs";
 import { env } from "./env";
 
-<<<<<<< HEAD
 // Vercel's filesystem is read-only except for /tmp
 // Use /tmp/uploads in production (Vercel), local UPLOAD_DIR in development
 const uploadDir = process.env.VERCEL
@@ -11,10 +10,6 @@ const uploadDir = process.env.VERCEL
   : path.resolve(env.UPLOAD_DIR);
 
 // Ensure upload directory exists (safe on both local and /tmp)
-=======
-// Ensure upload directory exists
-const uploadDir = path.resolve(env.UPLOAD_DIR);
->>>>>>> 81ef5bf1eb288139a17513bbf167f4ff33326c7c
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
