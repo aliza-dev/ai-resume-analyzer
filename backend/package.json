@@ -5,21 +5,13 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-<<<<<<< HEAD
     "build": "prisma generate && tsc",
-=======
-    "build": "tsc",
->>>>>>> 81ef5bf1eb288139a17513bbf167f4ff33326c7c
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-<<<<<<< HEAD
     "prisma:seed": "tsx prisma/seed.ts",
     "vercel-build": "prisma generate && tsc"
-=======
-    "prisma:seed": "tsx prisma/seed.ts"
->>>>>>> 81ef5bf1eb288139a17513bbf167f4ff33326c7c
   },
   "keywords": [
     "resume",
@@ -44,11 +36,7 @@
     "mammoth": "^1.12.0",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-<<<<<<< HEAD
-    "natural": "^5.2.4",
-=======
     "natural": "^8.1.1",
->>>>>>> 81ef5bf1eb288139a17513bbf167f4ff33326c7c
     "pdf-parse": "^1.1.1",
     "stopword": "^3.1.5",
     "stripe": "^20.4.1",
@@ -65,10 +53,7 @@
     "@types/natural": "^5.1.5",
     "@types/node": "^22.13.10",
     "@types/pdf-parse": "^1.1.5",
-<<<<<<< HEAD
     "@types/stopword": "^2.0.3",
-=======
->>>>>>> 81ef5bf1eb288139a17513bbf167f4ff33326c7c
     "prisma": "^6.5.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
