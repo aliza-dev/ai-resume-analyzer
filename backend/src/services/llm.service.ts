@@ -13,7 +13,12 @@ let genAI: GoogleGenerativeAI | null = null;
 function getModel() {
   if (!env.GEMINI_API_KEY) return null;
   if (!genAI) genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
-  return genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  return genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+      temperature: 0,
+    },
+  });
 }
 
 export function isLlmAvailable(): boolean {
@@ -189,7 +194,7 @@ Before adding ANY skill to "missing_keywords":
 
 RESUME (${wordCount} words):
 """
-${resumeText.slice(0, 5000)}
+${resumeText.slice(0, 8000)}
 """
 
 JSON format:
@@ -223,7 +228,14 @@ MANDATORY EDUCATION EXTRACTION (CRITICAL — read carefully):
 - If a formal section title is missing, look for ANY of these keywords ANYWHERE in the text: "Bachelor", "Master", "PhD", "BS", "MS", "B.Tech", "M.Tech", "MBA", "Diploma", "Associate", "University", "College", "Institute", "Degree", "GPA", "CGPA", "Graduated".
 - If ANY degree, university name, or academic qualification is mentioned ANYWHERE in the resume, education_score MUST be greater than 0%.
 - Scoring guide: Degree mentioned = at least 40%. Degree + University = at least 55%. Degree + University + Year = at least 70%. Degree + University + Year + GPA/Honors = 80-100%.
-- NEVER return education_score: 0 if the words "university", "college", "bachelor", "master", "degree", or "institute" appear in the text.`;
+- NEVER return education_score: 0 if the words "university", "college", "bachelor", "master", "degree", or "institute" appear in the text.
+
+SUGGESTION ACCURACY RULES (CRITICAL — avoid false positives):
+- Before suggesting "Add a dedicated Education section", verify the ENTIRE text for any education-related content (degree names, university names, graduation years, GPA). Education sections are often on LATER pages.
+- Before suggesting "Add a dedicated Projects section", check the entire text for project descriptions, GitHub links, or portfolio mentions.
+- NEVER suggest adding a section that ALREADY EXISTS in the resume, even if it appears late in the document.
+- If you detect the section exists but could be improved, say "Enhance your Education section with..." instead of "Add an Education section".
+- The "suggestions" array must contain ONLY actionable improvements that are genuinely missing. Double-check each suggestion against the full resume text.`;
 
   const result = await callGemini<LlmAnalysisResult>(prompt);
 
@@ -532,7 +544,17 @@ COVER LETTER SIGN-OFF (MANDATORY):
   John Smith
 - Do NOT end abruptly after the last paragraph. The sign-off is required.` : "";
 
-  const prompt = `You are a professional content writer specializing in career documents.
+  const prompt = `CRITICAL: You are a TRUTHFUL assistant. You MUST follow the anti-hallucination rules below before writing ANYTHING.
+
+=== ABSOLUTE ANTI-HALLUCINATION RULES (READ FIRST — HIGHEST PRIORITY) ===
+1. You MUST ONLY highlight skills, technologies, and experiences that EXPLICITLY EXIST in the RESUME text below.
+2. NEVER invent, fabricate, or hallucinate skills. If a skill appears in the JOB DESCRIPTION but NOT in the RESUME, you MUST completely ignore it. Do NOT mention it, do NOT claim the candidate has it, do NOT imply familiarity with it.
+3. If the JD requires Django/Python but the resume only lists React Native — you MUST NOT write "experienced in Django" or "proficient in Python". Instead, highlight the candidate's ACTUAL skills (React Native, JavaScript, etc.) and emphasize transferable abilities and willingness to learn.
+4. Before writing ANY skill name, do a mental check: "Is this word in the RESUME text above?" If NO → do NOT write it.
+5. EVERY technology, framework, or tool you mention MUST be traceable to the RESUME. Zero exceptions.
+=== END ANTI-HALLUCINATION RULES ===
+
+You are a professional content writer specializing in career documents.
 Today's date is ${today()}.
 
 Based on this resume and job description, write ${typeLabels[type]}.
@@ -566,7 +588,7 @@ PLAIN TEXT FORMATTING (CRITICAL):
 - For emphasis, use CAPITALIZATION sparingly or rephrase the sentence instead.
 - Emojis (like 🚀 💡 📩) are allowed ONLY for LinkedIn summaries.
 ${coverLetterRules}
-Make it professional, personalized, and compelling. Reference specific skills from the resume.`;
+Make it professional, personalized, and compelling. Reference ONLY specific skills that are explicitly listed in the RESUME — never from the JD alone.`;
 
   const result = await callGemini<{ type: string; content: string }>(prompt);
 
@@ -728,8 +750,16 @@ ${resumeText.slice(0, 4000)}
 
 TASK: Suggest 5 highly specific, modern project ideas for this candidate.
 
+=== STEP 0 — EXTRACT THE CANDIDATE'S ACTUAL SKILLS (MANDATORY) ===
+Before suggesting ANYTHING, list the candidate's top 5-8 technical skills from the RESUME.
+ALL project suggestions MUST use ONLY technologies from this extracted skill list (or their direct ecosystem).
+- If the resume shows React Native, JavaScript, Firebase → suggest projects using React Native, JavaScript, Firebase.
+- Do NOT suggest Vue.js, Angular, Django, Flask, or ANY technology that is NOT in the resume.
+- The "techStack" array for each project MUST contain ONLY skills the candidate already knows.
+- You may include 1 NEW related technology per project to help them grow (e.g., if they know React, you may suggest Next.js).
+
 STEP 1 — DETERMINE SKILL LEVEL:
-First, analyze the complexity of the user's EXISTING projects listed in the resume:
+Analyze the complexity of the user's EXISTING projects listed in the resume:
 - Beginner: Basic CRUD apps, static websites, simple scripts, TODO apps, calculators
 - Intermediate: Full-stack apps with auth, REST APIs, database integration, basic ML models, mobile apps
 - Advanced: Microservices, distributed systems, ML pipelines, real-time systems, cloud-native architectures, AI/LLM applications, scalable platforms
@@ -741,9 +771,10 @@ Suggest projects that are STRICTLY ONE LEVEL HIGHER in complexity than their cur
 - If they are Advanced → suggest Expert/cutting-edge projects (e.g., LLM agents, distributed ML, custom compilers, real-time data pipelines)
 
 CRITICAL RULES:
+- NEVER suggest technologies the candidate does NOT know. A React Native developer should NOT get Vue.js or Angular projects.
 - Do NOT suggest basic web apps (expense tracker, portfolio, TODO) to Intermediate/Advanced engineers.
 - Do NOT suggest "Build a chat app" to someone who already built real-time systems.
-- Each project must use technologies RELATED to but EXTENDING their current skills.
+- Each project must use technologies the candidate ALREADY HAS, applied to a harder problem.
 - Projects should be impressive enough to stand out on a resume / GitHub profile.
 
 Return this EXACT JSON:
@@ -782,6 +813,12 @@ ${resumeText.slice(0, 4000)}
 
 Analyze the candidate's current career level, then suggest realistic growth paths.
 
+STEP 0 — IDENTIFY ACTUAL SKILLS (MANDATORY):
+Before suggesting anything, extract the candidate's top 5 technical skills from the RESUME.
+All career path suggestions and "skillsToLearn" must be RELEVANT to their existing domain.
+- If the candidate is a React Native mobile developer, suggest paths like Senior Mobile Engineer, Mobile Architect, or Full-Stack Mobile Lead — NOT "Django Developer" or "ML Engineer".
+- "skillsToLearn" should be technologies in the SAME ecosystem (e.g., for React Native: TypeScript, GraphQL, CI/CD for mobile, App Store optimization, performance profiling) — NOT unrelated stacks.
+
 Return EXACT JSON:
 {
   "currentLevel": "<their current role/level>",
@@ -795,9 +832,9 @@ Return EXACT JSON:
 }
 
 Rules:
-- Be specific about the next role (not just "Senior" — say "Senior Backend Engineer" or "ML Team Lead")
-- skillsToLearn must be specific technologies or practices they DON'T already have
-- Include 2-3 alternative career paths in allPaths
+- Be specific about the next role (not just "Senior" — say "Senior Mobile Engineer" or "React Native Tech Lead")
+- skillsToLearn must be specific technologies or practices they DON'T already have BUT that are relevant to their domain
+- Include 2-3 alternative career paths in allPaths, all within a realistic progression from their current tech stack
 - Timeframes must be realistic`;
 
   return callGemini<LlmCareerGrowthResult>(prompt);

@@ -6,12 +6,19 @@
 
 <br/>
 
+### 🚀 **[▶ View Live Demo](https://aliza-resume-analyzer.vercel.app/)**
+
+<br/>
+
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Node.js](https://img.shields.io/badge/Node.js-22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Express](https://img.shields.io/badge/Express-4-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com)
 [![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://prisma.io)
 [![Gemini](https://img.shields.io/badge/Gemini_AI-2.5-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev)
 [![Stripe](https://img.shields.io/badge/Stripe-Payments-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://stripe.com)
+[![Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://aliza-resume-analyzer.vercel.app/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 <br/>
@@ -20,7 +27,7 @@
 
 <br/>
 
-[View Demo](#-app-showcase) · [Get Started](#-getting-started) · [Features](#-core-features) · [Architecture](#-system-architecture)
+[Live Demo](https://aliza-resume-analyzer.vercel.app/) · [Get Started](#-getting-started) · [Features](#-core-features) · [Architecture](#-system-architecture)
 
 </div>
 
@@ -28,6 +35,7 @@
 
 ## 📑 Table of Contents
 
+- [Live Demo](#-live-demo)
 - [The Problem & Solution](#-the-problem--solution)
 - [App Showcase](#-app-showcase)
 - [Core Features](#-core-features)
@@ -36,9 +44,28 @@
 - [Database Schema](#-database-schema)
 - [Getting Started](#-getting-started)
 - [Environment Variables](#-environment-variables)
+- [Folder Structure](#-folder-structure)
 - [Project Structure](#-project-structure)
 - [Contributing](#-contributing)
 - [License](#-license)
+- [Let's Connect](#-lets-connect)
+
+---
+
+## 🚀 Live Demo
+
+<div align="center">
+
+**🚀 [View Live Demo Here](https://aliza-resume-analyzer.vercel.app/)**
+
+Try the full app — upload a resume, get an AI-powered ATS score, generate cover letters, and explore career growth insights. No installation required.
+
+| | URL |
+| :--- | :--- |
+| 🌐 **Frontend** | [aliza-resume-analyzer.vercel.app](https://aliza-resume-analyzer.vercel.app/) |
+| ⚙️ **Backend API** | [ai-resume-backend-sable.vercel.app](https://ai-resume-backend-sable.vercel.app/) |
+
+</div>
 
 ---
 
@@ -274,7 +301,7 @@ erDiagram
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/ai-resume-analyzer.git
+git clone https://github.com/aliza-dev/ai-resume-analyzer.git
 cd ai-resume-analyzer
 ```
 
@@ -363,6 +390,37 @@ VITE_APP_NAME=AI Resume Analyzer
 VITE_API_URL=http://localhost:5000/api
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your-stripe-publishable-key
 VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
+```
+
+---
+
+## 🗂 Folder Structure
+
+```
+ai-resume-analyzer/
+├── frontend/                 # React 19 + TypeScript + Vite + TailwindCSS
+│   ├── src/
+│   │   ├── api/              # Axios client & API wrappers
+│   │   ├── components/       # Reusable UI (charts, layout, gates)
+│   │   ├── pages/            # 15+ pages (dashboard, auth, landing)
+│   │   ├── hooks/            # Zustand auth store, theme
+│   │   ├── utils/            # PDF generation, sanitization
+│   │   └── routes/           # Protected routes & router config
+│   └── index.html
+│
+├── backend/                  # Node.js + Express + Prisma + Gemini AI
+│   ├── prisma/               # MongoDB schema (User, Resume, Analysis)
+│   ├── src/
+│   │   ├── controllers/      # Auth & Analysis endpoints
+│   │   ├── services/         # AI engine (2500+ LOC), LLM prompts, NLP
+│   │   ├── middlewares/      # JWT auth, credit gating, error handler
+│   │   ├── routes/           # 20+ REST API routes
+│   │   ├── validators/       # Zod request schemas
+│   │   └── server.ts         # Express entry point
+│   └── uploads/              # Resume file storage
+│
+├── assets/                   # README screenshots
+└── README.md
 ```
 
 ---
@@ -494,6 +552,30 @@ Distributed under the **MIT License**. See [LICENSE](LICENSE) for more informati
 
 <br/>
 
-[Report Bug](https://github.com/yourusername/ai-resume-analyzer/issues) · [Request Feature](https://github.com/yourusername/ai-resume-analyzer/issues)
+[Report Bug](https://github.com/aliza-dev/ai-resume-analyzer/issues) · [Request Feature](https://github.com/aliza-dev/ai-resume-analyzer/issues)
+
+</div>
+
+---
+
+## 🤝 Let's Connect
+
+<div align="center">
+
+I'm always open to collaborations, freelance opportunities, and connecting with fellow developers!
+
+| | Link |
+| :--- | :--- |
+| 💼 **LinkedIn** | [linkedin.com/in/aliza-tariq-dev](https://www.linkedin.com/in/aliza-tariq-dev/) |
+| 🐙 **GitHub** | [github.com/aliza-dev](https://github.com/aliza-dev) |
+| 📧 **Email** | [alizait1192@gmail.com](mailto:alizait1192@gmail.com) |
+
+<br/>
+
+> *"The best way to predict the future is to build it."*
+
+<br/>
+
+Made with ❤️ and ☕ — If you found this useful, a ⭐ on the repo means the world!
 
 </div>

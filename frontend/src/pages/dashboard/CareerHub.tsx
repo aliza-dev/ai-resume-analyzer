@@ -18,29 +18,43 @@ export function CareerHubPage() {
   const [isCareerLoading, setIsCareerLoading] = useState(false);
   const [isProjectsLoading, setIsProjectsLoading] = useState(false);
 
+  // Find the selected resume object for analysis-status checks
+  const selectedResume = resumes.find((r) => r.id === selectedResumeId);
+  const hasAnalysis = !!selectedResume?.analysis;
+
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     resumeApi.getHistory().then((data) => {
       if (cancelled) return;
       setResumes(data);
-      if (data.length > 0) setSelectedResumeId(data[0].id);
+      // Prefer the first resume that already has analysis data
+      const analyzed = data.find((r) => r.analysis);
+      setSelectedResumeId(analyzed?.id || data[0]?.id || "");
     }).catch(() => {}).finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
   }, []);
 
   const handleCareer = async () => {
     if (!selectedResumeId) return;
+    if (!hasAnalysis) {
+      toast.error("Please analyze this resume first (go to Analysis page), then come back here.");
+      return;
+    }
     setIsCareerLoading(true);
     try { const r = await resumeApi.getCareerGrowth(selectedResumeId); setCareer(r); toast.success(`Next role: ${r.nextRole}`); }
-    catch { toast.error("Failed"); } finally { setIsCareerLoading(false); }
+    catch { toast.error("Career analysis failed. Please try again."); } finally { setIsCareerLoading(false); }
   };
 
   const handleProjects = async () => {
     if (!selectedResumeId) return;
+    if (!hasAnalysis) {
+      toast.error("Please analyze this resume first (go to Analysis page), then come back here.");
+      return;
+    }
     setIsProjectsLoading(true);
     try { const r = await resumeApi.suggestProjects(selectedResumeId); setProjects(r.projects); toast.success(`${r.projects.length} projects suggested!`); }
-    catch { toast.error("Failed"); } finally { setIsProjectsLoading(false); }
+    catch { toast.error("Project suggestions failed. Please try again."); } finally { setIsProjectsLoading(false); }
   };
 
   if (isLoading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" /></div>;
@@ -60,11 +74,20 @@ export function CareerHubPage() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Career Hub</h1>
         <p className="text-gray-500 dark:text-gray-400">Career growth path & AI project suggestions based on your resume</p>
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           <select value={selectedResumeId} onChange={(e) => { setSelectedResumeId(e.target.value); setCareer(null); setProjects([]); }}
             className="flex h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
-            {resumes.map((r) => <option key={r.id} value={r.id}>{r.fileName}</option>)}
+            {resumes.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.fileName} {r.analysis ? `(ATS: ${r.atsScore ?? "–"}%)` : "(not analyzed)"}
+              </option>
+            ))}
           </select>
+          {!hasAnalysis && selectedResumeId && (
+            <span className="text-xs text-amber-600 dark:text-amber-400">
+              ⚠️ This resume hasn't been analyzed yet — <Link to={`/analysis?resumeId=${selectedResumeId}`} className="underline font-medium">analyze it first</Link>
+            </span>
+          )}
         </div>
       </motion.div>
 

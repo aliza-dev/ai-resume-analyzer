@@ -22,10 +22,14 @@ apiClient.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
 
-    // ── 401 Unauthorized → redirect to landing page ──
+    // ── 401 Unauthorized → redirect to landing page (skip for auth endpoints) ──
     if (status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
-      window.location.href = "/";
+      const url = error.config?.url || "";
+      const isAuthRoute = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/google");
+      if (!isAuthRoute) {
+        localStorage.removeItem(TOKEN_KEY);
+        window.location.href = "/";
+      }
       return Promise.reject(error);
     }
 

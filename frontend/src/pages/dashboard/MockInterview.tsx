@@ -9,6 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { resumeApi } from "@/api/resume";
 import type { Resume, InterviewQuestion, AnswerEvaluation } from "@/types";
 
+/** Strip leading "- " bullet and render **bold** markdown inline */
+function renderMarkdown(text: string) {
+  const cleaned = text.replace(/^-\s+/, "");
+  return cleaned.split("**").map((part, i) =>
+    i % 2 === 1 ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>
+  );
+}
+
 export function MockInterviewPage() {
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState("");
@@ -152,14 +160,14 @@ export function MockInterviewPage() {
                     {evaluation.strengths.length > 0 && (
                       <div className="space-y-1">
                         {evaluation.strengths.map((s, i) => (
-                          <div key={i} className="flex items-start gap-2 text-xs"><CheckCircle2 className="mt-0.5 h-3 w-3 text-green-500" /><span className="text-green-700 dark:text-green-400">{s}</span></div>
+                          <div key={i} className="flex items-start gap-2 text-xs"><CheckCircle2 className="mt-0.5 h-3 w-3 text-green-500" /><span className="text-green-700 dark:text-green-400">{renderMarkdown(s)}</span></div>
                         ))}
                       </div>
                     )}
                     {evaluation.feedback.length > 0 && (
                       <div className="space-y-1">
                         {evaluation.feedback.map((f, i) => (
-                          <div key={i} className="flex items-start gap-2 text-xs"><XCircle className="mt-0.5 h-3 w-3 text-red-500" /><span className="text-red-700 dark:text-red-400">{f}</span></div>
+                          <div key={i} className="flex items-start gap-2 text-xs"><XCircle className="mt-0.5 h-3 w-3 text-red-500" /><span className="text-red-700 dark:text-red-400">{renderMarkdown(f)}</span></div>
                         ))}
                       </div>
                     )}

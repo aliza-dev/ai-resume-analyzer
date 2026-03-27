@@ -215,7 +215,7 @@ function extractSections(text: string): ExtractedSections {
     { key: "summary",        pattern: /^(?:professional\s+)?(?:summary|objective|about\s+me|profile|career\s+(?:summary|objective|profile)|executive\s+summary|introduction|personal\s+statement)$/i },
     { key: "experience",     pattern: /^(?:(?:work|professional|employment|career|job)\s+)?(?:experience|history)|(?:experience|employment|work)\s*(?:history|background)?$/i },
     { key: "skills",         pattern: /^(?:(?:technical|core|key|professional|relevant)\s+)?(?:skills|competencies|proficiencies|technologies|expertise|tech\s+stack|tools\s*(?:&|and)?\s*technologies|areas?\s+of\s+expertise|technical\s+proficiency)$/i },
-    { key: "education",      pattern: /^(?:education|academic\s+(?:background|qualifications|history)|qualifications|educational\s+background|degrees?|academics?)$/i },
+    { key: "education",      pattern: /^(?:education|academic\s+(?:background|qualifications|history)|qualifications|educational\s+(?:background|qualifications)|degrees?|academics?|academic\s+details?)$/i },
     { key: "projects",       pattern: /^(?:(?:personal|academic|key|relevant|research|notable|side)\s+)?(?:projects|portfolio|contributions|open\s+source)$/i },
     { key: "certifications", pattern: /^(?:certifications?|licenses?(?:\s*(?:&|and)\s*certifications?)?|professional\s+(?:certifications?|development)|courses?|training)$/i },
   ];
@@ -332,7 +332,7 @@ class AnalysisEngine {
   private static readonly SECTION_PATTERNS = {
     skills:   /\b(skills|technical\s+skills|core\s+competencies|key\s+skills|technologies|tools|proficiency|competencies|tech\s+stack|areas?\s+of\s+expertise|relevant\s+skills|professional\s+skills|technical\s+proficiency)\b/i,
     experience: /\b(experience|work\s+experience|professional\s+experience|employment|employment\s+history|work\s+history|career\s+history|job\s+experience|professional\s+background)\b/i,
-    education: /\b(education|educational\s+background|academic\s+background|academic\s+qualifications|qualifications|degrees?|academics?|university|college|bachelor|master|phd|certification|certifications?)\b/i,
+    education: /\b(education|educational\s+background|academic\s+background|academic\s+qualifications|qualifications|degrees?|academics?|university|college|bachelor|master|phd|b\.?tech|m\.?tech|b\.?s\.?|m\.?s\.?|mba|diploma|certification|certifications?|institute|graduated|graduation)\b/i,
     projects: /\b(projects|personal\s+projects|academic\s+projects|key\s+projects|notable\s+projects|research\s+projects|side\s+projects|portfolio|open\s+source|contributions)\b/i,
     summary:  /\b(summary|professional\s+summary|career\s+summary|executive\s+summary|objective|career\s+objective|about\s+me|profile|personal\s+statement|introduction)\b/i,
     contact:  /\b(email|phone|address|linkedin|github|portfolio|website|contact|mobile)\b/i,
@@ -1284,19 +1284,27 @@ class AnalysisEngine {
       projSection.tips.push("Add 2-3 projects with description, tech stack, and links");
     }
 
-    // Analyze Education
+    // Analyze Education — Deep scan: education info may appear ANYWHERE in the document
     const eduSection = sections[4];
-    eduSection.found = eduSection.pattern.test(text);
+    // Check for explicit section header OR any education-related content anywhere in the text
+    const hasEduHeader = eduSection.pattern.test(text);
+    const hasEduContent = /\b(bachelor|master|phd|b\.?s\.?|m\.?s\.?|b\.?tech|m\.?tech|b\.?e\.?|m\.?e\.?|mba|bca|mca|diploma|associate|b\.?sc|m\.?sc|b\.?a\.?|m\.?a\.?|b\.?com|m\.?com)\b/i.test(text)
+      || /\b(university|college|institute|school of|faculty of|graduated|graduation|alma mater)\b/i.test(text)
+      || /\b(degree|gpa|cgpa|academic|semester|coursework)\b/i.test(text);
+    eduSection.found = hasEduHeader || hasEduContent;
     if (eduSection.found) {
       let s = 50;
-      if (/\b(bachelor|master|phd|b\.?s|m\.?s|b\.?tech|m\.?tech|mba|diploma)\b/i.test(text)) s += 20;
+      if (/\b(bachelor|master|phd|b\.?s\.?|m\.?s\.?|b\.?tech|m\.?tech|b\.?e\.?|m\.?e\.?|mba|bca|mca|diploma|associate|b\.?sc|m\.?sc|b\.?a\.?|m\.?a\.?|b\.?com|m\.?com)\b/i.test(text)) s += 20;
       else eduSection.issues.push("No degree type mentioned");
-      if (/\b(university|college|institute)\b/i.test(text)) s += 15;
-      if (/\b(gpa|cgpa|grade|percentage|honors|distinction|cum laude)\b/i.test(text)) s += 15;
+      if (/\b(university|college|institute|school of)\b/i.test(text)) s += 15;
+      if (/\b(gpa|cgpa|grade|percentage|honors|distinction|cum laude|summa|magna)\b/i.test(text)) s += 15;
       else eduSection.issues.push("No GPA or academic honors mentioned");
       eduSection.score = Math.min(s, 100);
       eduSection.tips.push("Include GPA if above 3.0 (or equivalent)");
       eduSection.tips.push("Add relevant coursework or academic achievements");
+      if (!hasEduHeader) {
+        eduSection.tips.push("Consider adding an explicit 'Education' section header for better ATS parsing");
+      }
     } else {
       eduSection.score = 0;
       eduSection.issues.push("No education section found");
@@ -2129,10 +2137,10 @@ export class AnalysisService {
   }
 
   async generateSmartFeedback(resumeId: string, userId: string) {
-    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId } });
+    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
 
-    const resumeText = await extractTextFromFile(resume.fileUrl);
+    const resumeText = await this._getResumeTextWithFallback(resume);
 
     // ── Try LLM first ──
     if (isLlmAvailable()) {
@@ -2172,7 +2180,7 @@ export class AnalysisService {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
 
-    const resumeText = await extractTextFromFile(resume.fileUrl);
+    const resumeText = await this._getResumeTextWithFallback(resume);
 
     // Run the rule-based section analyzer to get tips, issues, and found/not-found status
     const freshResult = AnalysisEngine.analyzeSections(resumeText);
@@ -2226,7 +2234,7 @@ export class AnalysisService {
   async getResumePreview(resumeId: string, userId: string) {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
-    const text = await extractTextFromFile(resume.fileUrl);
+    const text = await this._getResumeTextWithFallback(resume);
     const sections = extractSections(text);
     const nlp = runNlpAnalysis(text, AnalysisEngine.TECH_KEYWORDS);
     const lower = text.toLowerCase();
@@ -2296,7 +2304,7 @@ export class AnalysisService {
   async getHiringProbability(resumeId: string, userId: string) {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
-    const text = await extractTextFromFile(resume.fileUrl);
+    const text = await this._getResumeTextWithFallback(resume);
     const a = resume.analysis ? { skillsScore: resume.analysis.skillsScore, experienceScore: resume.analysis.experienceScore, educationScore: resume.analysis.educationScore, projectsScore: resume.analysis.projectsScore, keywords: resume.analysis.keywords, missingKeywords: resume.analysis.missingKeywords } : null;
     return AnalysisEngine.calculateHiringProbability(text, resume.atsScore || 0, a);
   }
@@ -2355,19 +2363,65 @@ export class AnalysisService {
   }
 
   async analyzeReadability(resumeId: string, userId: string) {
-    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId } });
+    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
-    const resumeText = await extractTextFromFile(resume.fileUrl);
+    const resumeText = await this._getResumeTextWithFallback(resume);
     return AnalysisEngine.analyzeReadability(resumeText);
   }
 
+  /**
+   * Build fallback resume context from stored analysis data when file extraction fails
+   * (e.g., on Vercel where /tmp is ephemeral between serverless invocations)
+   */
+  private async _getResumeTextWithFallback(
+    resume: { fileUrl: string; fileName: string; atsScore?: number | null; analysis?: { keywords: string[]; missingKeywords: string[]; suggestions: string[]; skillsScore: number; experienceScore: number; educationScore: number; projectsScore: number } | null },
+  ): Promise<string> {
+    let text = await extractTextFromFile(resume.fileUrl);
+
+    // If we got meaningful text from the file, return it
+    if (text.trim() && text.split(/\s+/).length >= 20) {
+      return text;
+    }
+
+    // File not accessible (Vercel ephemeral /tmp) — build context from stored data
+    const storedKeywords = resume.analysis?.keywords || [];
+    const a = resume.analysis;
+
+    if (storedKeywords.length > 0) {
+      // Best fallback: we have keywords from a previous analysis
+      console.log(`[Fallback] File not accessible — building context from ${storedKeywords.length} stored keywords`);
+      text = `Resume for ${resume.fileName}.\n` +
+        `Skills & Technologies: ${storedKeywords.join(", ")}.\n` +
+        `ATS Score: ${resume.atsScore ?? 0}%.\n` +
+        `Skills Score: ${a?.skillsScore ?? 0}%. Experience Score: ${a?.experienceScore ?? 0}%. ` +
+        `Education Score: ${a?.educationScore ?? 0}%. Projects Score: ${a?.projectsScore ?? 0}%.`;
+      if (a?.suggestions && a.suggestions.length > 0) {
+        text += `\nKey suggestions: ${a.suggestions.slice(0, 3).join("; ")}.`;
+      }
+    } else if (a) {
+      // We have an analysis record but no keywords — use scores + fileName
+      console.log("[Fallback] File not accessible, no keywords — using scores and fileName");
+      text = `Resume: ${resume.fileName}. ATS Score: ${resume.atsScore ?? 0}%. ` +
+        `Skills: ${a.skillsScore}%. Experience: ${a.experienceScore}%. ` +
+        `Education: ${a.educationScore}%. Projects: ${a.projectsScore}%.`;
+    } else {
+      // No analysis at all — use fileName as minimal hint
+      console.log("[Fallback] File not accessible, no analysis — using fileName only");
+      const nameHint = resume.fileName.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+      text = `Resume file: ${nameHint}. This resume has not been analyzed yet. ` +
+        `Please analyze the resume first to get accurate career suggestions.`;
+    }
+
+    return text;
+  }
+
   async getCareerGrowth(resumeId: string, userId: string) {
-    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId } });
+    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
-    const resumeText = await extractTextFromFile(resume.fileUrl);
+    const resumeText = await this._getResumeTextWithFallback(resume);
 
     // Use LLM for smarter career growth analysis
-    if (isLlmAvailable()) {
+    if (isLlmAvailable() && resumeText.split(/\s+/).length > 10) {
       console.log("[Career] Using Gemini AI for career growth...");
       const llmResult = await llmCareerGrowth(resumeText);
       if (llmResult) return llmResult;
@@ -2378,12 +2432,12 @@ export class AnalysisService {
   }
 
   async suggestProjects(resumeId: string, userId: string) {
-    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId } });
+    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
-    const resumeText = await extractTextFromFile(resume.fileUrl);
+    const resumeText = await this._getResumeTextWithFallback(resume);
 
     // Use LLM for complexity-aware suggestions
-    if (isLlmAvailable()) {
+    if (isLlmAvailable() && resumeText.split(/\s+/).length > 10) {
       console.log("[Projects] Using Gemini AI for complexity-aware suggestions...");
       const llmResult = await llmSuggestProjects(resumeText);
       if (llmResult?.projects && llmResult.projects.length > 0) {
@@ -2400,7 +2454,7 @@ export class AnalysisService {
     if (!resume) throw new Error("Resume not found");
 
     if (isLlmAvailable()) {
-      const resumeText = await extractTextFromFile(resume.fileUrl);
+      const resumeText = await this._getResumeTextWithFallback(resume);
       const llmResult = await llmEvaluateAnswer(question, answer, resumeText);
       if (llmResult) return llmResult;
     }
@@ -2412,7 +2466,7 @@ export class AnalysisService {
   async chat(resumeId: string, userId: string, question: string) {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
-    const resumeText = await extractTextFromFile(resume.fileUrl);
+    const resumeText = await this._getResumeTextWithFallback(resume);
 
     // ── Try LLM first ──
     if (isLlmAvailable()) {
@@ -2437,11 +2491,11 @@ export class AnalysisService {
   }
 
   async generateContent(resumeId: string, userId: string, jobDescription: string, type: "cover_letter" | "linkedin_summary" | "professional_bio") {
-    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId } });
+    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
-    const resumeText = await extractTextFromFile(resume.fileUrl);
+    const resumeText = await this._getResumeTextWithFallback(resume);
 
-    if (isLlmAvailable()) {
+    if (isLlmAvailable() && resumeText.split(/\s+/).length > 10) {
       console.log(`[Content] Using Gemini AI for ${type}...`);
       const llmResult = await llmGenerateContent(resumeText, jobDescription, type);
       if (llmResult) return llmResult;
