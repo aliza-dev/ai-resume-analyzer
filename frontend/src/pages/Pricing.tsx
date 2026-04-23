@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import ReactGA from "react-ga4"; // Added GA4 Import
 import { Check, Brain, ArrowRight, Sparkles, Zap } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { API_URL, TOKEN_KEY } from "@/utils/constants";
 
-// ── Initialize Stripe.js ONCE outside the component (industry standard) ──
 const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
   : null;
@@ -53,21 +53,25 @@ export function PricingPage() {
   const isPro = user?.isPro === true;
   const [isUpgrading, setIsUpgrading] = useState(false);
 
-  // Ensure auth state is loaded on this public page
   useEffect(() => { loadUser(); }, []);
 
   const handleUpgrade = async () => {
+    // Track Payment Click Event
+    ReactGA.event({
+      category: "Monetization",
+      action: "Clicked_Stripe_Checkout",
+      label: "User attempted to upgrade to Pro Plan",
+    });
+
     setIsUpgrading(true);
 
     try {
-      // Get token — if missing, redirect to login
       const token = localStorage.getItem(TOKEN_KEY);
       if (!token) {
         window.location.href = "/login";
         return;
       }
 
-      // 1. Call backend to create a Stripe Checkout Session
       const res = await fetch(`${API_URL}/stripe/create-checkout`, {
         method: "POST",
         headers: {
@@ -76,7 +80,6 @@ export function PricingPage() {
         },
       });
 
-      // If unauthorized, redirect to login silently
       if (res.status === 401) {
         window.location.href = "/login";
         return;
@@ -84,18 +87,15 @@ export function PricingPage() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        console.error("[Stripe] Backend error:", res.status, errData);
         toast.error(errData.message || "Failed to create checkout session");
         return;
       }
 
       const data = await res.json();
 
-      // 2. Redirect using Stripe.js (preferred) or fallback to URL
       if (stripePromise && data.id) {
         const stripe = await stripePromise;
         if (!stripe) {
-          console.error("[Stripe] Failed to load Stripe.js");
           toast.error("Payment system failed to load. Please refresh and try again.");
           return;
         }
@@ -103,18 +103,14 @@ export function PricingPage() {
         // @ts-ignore
         const { error } = await stripe.redirectToCheckout({ sessionId: data.id });
         if (error) {
-          console.error("[Stripe] redirectToCheckout error:", error.message);
           toast.error(error.message || "Checkout redirect failed");
         }
       } else if (data.url) {
-        // Fallback: direct URL redirect (works even without VITE_STRIPE_PUBLISHABLE_KEY)
         window.location.href = data.url;
       } else {
-        console.error("[Stripe] No session ID or URL returned:", data);
         toast.error("Failed to start checkout. Please try again.");
       }
     } catch (err) {
-      console.error("[Stripe] Checkout error:", err);
       toast.error("Failed to connect to payment server. Please try again.");
     } finally {
       setIsUpgrading(false);
@@ -123,7 +119,6 @@ export function PricingPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      {/* Navbar */}
       <nav className="flex items-center justify-between px-6 py-5">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
@@ -138,7 +133,6 @@ export function PricingPage() {
         </Link>
       </nav>
 
-      {/* Header */}
       <div className="relative overflow-hidden px-6 pb-10 pt-10 text-center">
         <div className="pointer-events-none absolute inset-0 -z-10">
           <div className="absolute left-1/2 top-0 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-indigo-600/15 blur-[120px]" />
@@ -155,9 +149,7 @@ export function PricingPage() {
         </motion.div>
       </div>
 
-      {/* Plans */}
       <div className="mx-auto grid max-w-4xl gap-6 px-6 pb-24 md:grid-cols-2">
-        {/* Free Plan */}
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={1}
           className="flex flex-col rounded-2xl border border-white/[0.06] bg-white/[0.03] p-8">
           <div className="mb-6">
@@ -179,10 +171,8 @@ export function PricingPage() {
           </Link>
         </motion.div>
 
-        {/* Pro Plan */}
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={2}
           className="relative flex flex-col rounded-2xl border-2 border-indigo-500/50 bg-gradient-to-b from-indigo-500/[0.08] to-transparent p-8 shadow-xl shadow-indigo-500/10">
-          {/* Popular badge */}
           <div className="absolute -top-3 left-1/2 -translate-x-1/2">
             <span className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-1 text-xs font-bold text-white shadow-lg shadow-indigo-500/40">
               MOST POPULAR

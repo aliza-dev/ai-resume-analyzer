@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactGA from "react-ga4"; // Added GA4 Import
 import {
   Upload,
   FileText,
@@ -30,9 +31,17 @@ export function UploadResumePage() {
 
   const handleSample = (sample: SampleResume) => {
     if (loadingSample) return;
+
+    // Track Sample View Event
+    ReactGA.event({
+      category: "Resume Features",
+      action: "View_Sample_CV",
+      label: `Sample: ${sample.name}`,
+    });
+
     setLoadingSample(sample.id);
     toast.loading(`Loading ${sample.name}'s analysis...`, { id: "sample" });
-    // Simulate 2-second analysis
+    
     setTimeout(() => {
       setLoadingSample(null);
       toast.success("Viewing sample analysis. Upload your own CV to get personalized insights!", { id: "sample", duration: 5000 });
@@ -85,10 +94,17 @@ export function UploadResumePage() {
 
   const handleUpload = async () => {
     if (!file) return;
+
+    // Track CV Upload Event
+    ReactGA.event({
+      category: "Resume Features",
+      action: "Upload_Personal_CV",
+      label: `File Type: ${file.type}`,
+    });
+
     setIsUploading(true);
     setUploadError("");
 
-    // Simulate upload progress
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 90) {
@@ -109,10 +125,17 @@ export function UploadResumePage() {
         description: "Starting AI analysis...",
       });
 
-      // Auto-analyze the resume
       setIsAnalyzing(true);
       try {
         await resumeApi.analyze(resume.id);
+        
+        // Track Successful AI Analysis Event
+        ReactGA.event({
+          category: "AI Analysis",
+          action: "Analysis_Complete",
+          label: "Resume successfully processed by AI",
+        });
+
         toast.success("Analysis complete!", {
           description: "Redirecting to your results...",
         });
@@ -129,8 +152,7 @@ export function UploadResumePage() {
       clearInterval(progressInterval);
       setUploadProgress(0);
       const error = err as { response?: { data?: { message?: string } } };
-      const msg =
-        error.response?.data?.message || "Upload failed. Please try again.";
+      const msg = error.response?.data?.message || "Upload failed. Please try again.";
       setUploadError(msg);
       toast.error("Upload failed", { description: msg });
     } finally {
@@ -172,7 +194,6 @@ export function UploadResumePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Dropzone */}
             <div
               {...getRootProps()}
               className={`group relative cursor-pointer rounded-xl border-2 border-dashed p-10 text-center transition-all duration-300 ${
@@ -211,7 +232,6 @@ export function UploadResumePage() {
               )}
             </div>
 
-            {/* Selected File */}
             <AnimatePresence>
               {file && (
                 <motion.div
@@ -249,7 +269,6 @@ export function UploadResumePage() {
               )}
             </AnimatePresence>
 
-            {/* Upload Progress */}
             <AnimatePresence>
               {(isUploading || isAnalyzing) && (
                 <motion.div
@@ -295,7 +314,6 @@ export function UploadResumePage() {
               )}
             </AnimatePresence>
 
-            {/* Error */}
             <AnimatePresence>
               {uploadError && (
                 <motion.div
@@ -310,7 +328,6 @@ export function UploadResumePage() {
               )}
             </AnimatePresence>
 
-            {/* Success */}
             <AnimatePresence>
               {uploadProgress === 100 && (
                 <motion.div
@@ -324,7 +341,6 @@ export function UploadResumePage() {
               )}
             </AnimatePresence>
 
-            {/* Upload Button */}
             <Button
               className="w-full gap-2"
               disabled={!file || isUploading || isAnalyzing}
@@ -342,13 +358,11 @@ export function UploadResumePage() {
         </Card>
       </motion.div>
 
-      {/* ═══ OR TRY A SAMPLE ═══ */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.15 }}
       >
-        {/* Divider */}
         <div className="relative my-2">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-200 dark:border-gray-700" />
@@ -406,7 +420,6 @@ export function UploadResumePage() {
         </div>
       </motion.div>
 
-      {/* Steps Info */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -416,21 +429,9 @@ export function UploadResumePage() {
           <CardContent className="p-6">
             <div className="grid gap-4 sm:grid-cols-3">
               {[
-                {
-                  step: "1",
-                  title: "Upload PDF",
-                  desc: "Drop your resume file",
-                },
-                {
-                  step: "2",
-                  title: "AI Analysis",
-                  desc: "Automatic scoring",
-                },
-                {
-                  step: "3",
-                  title: "Get Results",
-                  desc: "Actionable insights",
-                },
+                { step: "1", title: "Upload PDF", desc: "Drop your resume file" },
+                { step: "2", title: "AI Analysis", desc: "Automatic scoring" },
+                { step: "3", title: "Get Results", desc: "Actionable insights" },
               ].map((item, i) => (
                 <div key={item.step} className="flex items-center gap-3">
                   <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-purple-500 text-sm font-bold text-white shadow-lg shadow-brand-500/25">
