@@ -118,7 +118,7 @@ export function VisualizationsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6 overflow-x-hidden">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Resume Visualizations</h1>
         <p className="text-gray-500 dark:text-gray-400">Skills cloud, top technologies, and highlighted resume preview</p>
@@ -127,15 +127,15 @@ export function VisualizationsPage() {
       {/* Controls */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <Card>
-          <CardContent className="flex flex-wrap items-end gap-4 p-4">
-            <div className="flex-1 space-y-1">
+          <CardContent className="flex min-w-0 flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4">
+            <div className="min-w-0 flex-1 space-y-1">
               <label className="text-xs font-medium text-gray-500">Select Resume</label>
               <select value={selectedResumeId} onChange={(e) => setSelectedResumeId(e.target.value)}
-                className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+                className="flex h-10 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
                 {resumes.map((r) => <option key={r.id} value={r.id}>{r.fileName} — {new Date(r.createdAt).toLocaleDateString()}</option>)}
               </select>
             </div>
-            <Button onClick={handleLoad} isLoading={isPreviewLoading} className="gap-2 shadow-lg shadow-brand-500/25">
+            <Button onClick={handleLoad} isLoading={isPreviewLoading} className="w-full gap-2 shadow-lg shadow-brand-500/25 sm:w-auto sm:shrink-0">
               <Eye className="h-4 w-4" /> {preview ? "Refresh" : "Visualize"}
             </Button>
           </CardContent>
@@ -150,7 +150,7 @@ export function VisualizationsPage() {
               <CardContent className="space-y-4 p-6">
                 <div className="h-5 w-1/3 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
                 <div className="h-4 w-2/3 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[1, 2, 3, 4].map((j) => (
                     <div key={j} className="h-20 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
                   ))}

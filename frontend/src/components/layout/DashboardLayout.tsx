@@ -9,7 +9,7 @@ export function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-950">
+    <div className="flex h-screen min-w-0 overflow-hidden bg-gray-50 dark:bg-slate-950">
       {/* Subtle gradient orbs in background */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden dark:block hidden">
         <div className="absolute -left-40 top-0 h-[500px] w-[500px] rounded-full bg-indigo-500/5 blur-3xl" />
@@ -18,10 +18,10 @@ export function DashboardLayout() {
 
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <DashboardTopBar />
-        <main className="flex flex-1 flex-col overflow-y-auto p-4 lg:p-6 scrollbar-thin">
+        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4 py-4 lg:px-6 lg:py-6 scrollbar-thin">
           <Outlet />
         </main>
       </div>

@@ -65,7 +65,7 @@ function PlanStep({ selected, onSelect, onContinue }: { selected: string; onSele
   const { user } = useAuth();
   return (
     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[280px_1fr]">
         {/* Sidebar: profile + credits */}
         <div className="space-y-4">
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-slate-900">
@@ -190,8 +190,8 @@ function PaymentForm({ plan, onBack, onSuccess }: { plan: typeof PLANS[0]; onBac
         <ArrowLeft className="h-4 w-4" /> Back to plans
       </button>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[1fr_320px]">
+        <form onSubmit={handleSubmit} className="min-w-0 space-y-5">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Payment Details</h2>
 
           {/* Card preview */}
@@ -306,7 +306,7 @@ export function PurchasePage() {
   const plan = PLANS.find((p) => p.id === selectedPlan) || PLANS[1];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
+    <div className="min-h-screen min-w-0 overflow-x-hidden bg-gray-50 dark:bg-slate-950">
       {/* Top bar */}
       <div className="border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-5xl items-center justify-between">

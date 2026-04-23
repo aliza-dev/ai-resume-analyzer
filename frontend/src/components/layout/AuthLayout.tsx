@@ -4,7 +4,7 @@ import { Brain } from "lucide-react";
 
 export function AuthLayout() {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen min-w-0 overflow-x-hidden">
       {/* Left Panel - Branding */}
       <div className="hidden w-1/2 bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-12">
         <motion.div

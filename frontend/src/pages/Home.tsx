@@ -349,7 +349,7 @@ const stats = [
  * ═══════════════════════════════════════════════════════════════════ */
 export function HomePage() {
   return (
-    <div className="min-h-screen bg-slate-950 text-white selection:bg-indigo-500/30">
+    <div className="min-h-screen min-w-0 overflow-x-hidden bg-slate-950 text-white selection:bg-indigo-500/30">
       {/* ── FLOATING NAVBAR ─────────────────────────────────────── */}
       <nav className="fixed inset-x-0 top-4 z-50 mx-auto max-w-6xl px-4">
         <div className="flex items-center justify-between rounded-2xl border border-white/[0.08] bg-slate-900/70 px-5 py-3 shadow-xl shadow-black/20 backdrop-blur-xl">

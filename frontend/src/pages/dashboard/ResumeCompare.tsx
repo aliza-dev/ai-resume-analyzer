@@ -94,7 +94,7 @@ export function ResumeComparePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Resume Comparison</h1>
         <p className="text-gray-500 dark:text-gray-400">Compare your old resume with the improved version</p>
@@ -104,11 +104,11 @@ export function ResumeComparePage() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <Card>
           <CardContent className="p-6">
-            <div className="grid items-end gap-4 sm:grid-cols-[1fr_auto_1fr_auto]">
-              <div className="space-y-1.5">
+            <div className="grid w-full min-w-0 items-end gap-4 sm:grid-cols-[1fr_auto_1fr_auto]">
+              <div className="min-w-0 space-y-1.5">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">📄 Old Resume</label>
                 <select value={oldId} onChange={(e) => handleOldChange(e.target.value)}
-                  className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+                  className="flex h-10 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
                   {resumes.map((r) => (
                     <option key={r.id} value={r.id} disabled={r.id === newId}>
                       {label(r)}{r.id === newId ? " (selected as New)" : ""}
@@ -119,10 +119,10 @@ export function ResumeComparePage() {
               <div className="flex items-center justify-center pb-1">
                 <span className="text-xl text-gray-400">→</span>
               </div>
-              <div className="space-y-1.5">
+              <div className="min-w-0 space-y-1.5">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">📄 New Resume</label>
                 <select value={newId} onChange={(e) => handleNewChange(e.target.value)}
-                  className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+                  className="flex h-10 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
                   {resumes.map((r) => (
                     <option key={r.id} value={r.id} disabled={r.id === oldId}>
                       {label(r)}{r.id === oldId ? " (selected as Old)" : ""}
@@ -131,7 +131,7 @@ export function ResumeComparePage() {
                 </select>
               </div>
               <Button onClick={handleCompare} isLoading={isComparing} disabled={isSameResume || !oldId || !newId}
-                className="gap-2 shadow-lg shadow-brand-500/25">
+                className="w-full gap-2 shadow-lg shadow-brand-500/25 sm:w-auto">
                 <GitCompareArrows className="h-4 w-4" /> Compare
               </Button>
             </div>
@@ -187,21 +187,22 @@ export function ResumeComparePage() {
               <CardTitle>Detailed Comparison</CardTitle>
               <CardDescription>Side-by-side metric breakdown</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-4 gap-4 border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-800/50">
-                  <span>Metric</span>
-                  <span className="text-center">Old</span>
-                  <span className="text-center">New</span>
-                  <span className="text-center">Change</span>
-                </div>
-                {result.comparisons.map((c, i) => {
-                  const diff = c.new - c.old;
-                  return (
-                    <motion.div key={c.label}
-                      initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                      className="grid grid-cols-4 items-center gap-4 border-b border-gray-100 px-4 py-3 last:border-0 dark:border-gray-800">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">{c.label}</span>
+            <CardContent className="min-w-0">
+              <div className="w-full min-w-0 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                <div className="min-w-[20rem]">
+                  <div className="grid grid-cols-4 gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500 sm:gap-4 sm:px-4 dark:border-gray-700 dark:bg-gray-800/50">
+                    <span>Metric</span>
+                    <span className="text-center">Old</span>
+                    <span className="text-center">New</span>
+                    <span className="text-center">Change</span>
+                  </div>
+                  {result.comparisons.map((c, i) => {
+                    const diff = c.new - c.old;
+                    return (
+                      <motion.div key={c.label}
+                        initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                        className="grid grid-cols-4 items-center gap-2 border-b border-gray-100 px-3 py-3 last:border-0 sm:gap-4 sm:px-4 dark:border-gray-800">
+                      <span className="min-w-0 text-sm font-medium text-gray-900 dark:text-white">{c.label}</span>
                       <span className="text-center text-sm text-gray-500">{c.old}{c.unit}</span>
                       <span className="text-center text-sm font-semibold text-gray-900 dark:text-white">{c.new}{c.unit}</span>
                       <div className="flex items-center justify-center">
@@ -222,6 +223,7 @@ export function ResumeComparePage() {
                     </motion.div>
                   );
                 })}
+                </div>
               </div>
             </CardContent>
           </Card>

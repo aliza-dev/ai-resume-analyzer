@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export function NotFoundPage() {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-6">
+    <div className="relative flex min-h-screen min-w-0 items-center justify-center overflow-x-hidden overflow-y-hidden bg-slate-950 px-6">
       {/* Ambient glow orbs */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute left-1/2 top-1/3 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-600/15 blur-[120px]" />

@@ -751,7 +751,7 @@ export function ResumeAnalysisPage() {
                         </div>
 
                         {/* Metrics Grid */}
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                           {[
                             { label: "Avg Sentence", value: `${readabilityData.metrics.avgSentenceLength} words`, good: readabilityData.metrics.avgSentenceLength <= 20 },
                             { label: "Total Words", value: String(readabilityData.metrics.totalWords), good: readabilityData.metrics.totalWords >= 200 },

@@ -153,7 +153,7 @@ export function JobMatchPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6 overflow-x-hidden">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -339,7 +339,7 @@ export function JobMatchPage() {
               </CardHeader>
               <CardContent className="p-6">
                 {/* Summary Stats */}
-                <div className="mb-6 grid grid-cols-3 gap-4">
+                <div className="mb-6 grid grid-cols-1 gap-3 min-[400px]:grid-cols-3 sm:gap-4">
                   <div className="rounded-xl bg-green-50 p-4 text-center dark:bg-green-900/20">
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                       {matchResult.keywordsFound.length}
@@ -372,64 +372,66 @@ export function JobMatchPage() {
                   <h4 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
                     Skill-by-Skill Comparison
                   </h4>
-                  <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
-                    {/* Header */}
-                    <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-800/50">
-                      <span>Skill</span>
-                      <span className="w-20 text-center">Status</span>
-                      <span className="w-24 text-center">Action</span>
+                  <div className="w-full min-w-0 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="min-w-[18rem]">
+                      {/* Header */}
+                      <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500 sm:gap-4 sm:px-4 dark:border-gray-700 dark:bg-gray-800/50">
+                        <span className="min-w-0">Skill</span>
+                        <span className="w-20 shrink-0 text-center">Status</span>
+                        <span className="w-24 shrink-0 text-center">Action</span>
+                      </div>
+
+                      {/* Matched Skills */}
+                      {matchResult.keywordsFound.map((skill, i) => (
+                        <motion.div
+                          key={`match-${skill}`}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.03 }}
+                          className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-b border-gray-100 px-3 py-3 last:border-0 sm:gap-4 sm:px-4 dark:border-gray-800"
+                        >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
+                            <span className="truncate text-sm font-medium capitalize text-gray-900 dark:text-white">
+                              {skill}
+                            </span>
+                          </div>
+                          <Badge variant="success" className="w-20 shrink-0 justify-center">
+                            Matched
+                          </Badge>
+                          <span className="w-24 shrink-0 text-center text-xs text-green-600 dark:text-green-400">
+                            ✓ You have this
+                          </span>
+                        </motion.div>
+                      ))}
+
+                      {/* Missing Skills */}
+                      {matchResult.missingKeywords.map((skill, i) => (
+                        <motion.div
+                          key={`miss-${skill}`}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{
+                            delay:
+                              matchResult.keywordsFound.length * 0.03 + i * 0.03,
+                          }}
+                          className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-b border-gray-100 bg-red-50/30 px-3 py-3 last:border-0 sm:gap-4 sm:px-4 dark:border-gray-800 dark:bg-red-900/5"
+                        >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <XCircle className="h-4 w-4 shrink-0 text-red-500" />
+                            <span className="truncate text-sm font-medium capitalize text-gray-900 dark:text-white">
+                              {skill}
+                            </span>
+                          </div>
+                          <Badge variant="danger" className="w-20 shrink-0 justify-center">
+                            Missing
+                          </Badge>
+                          <span className="w-24 shrink-0 text-center text-xs text-red-600 dark:text-red-400">
+                            ⚡ Learn this
+                          </span>
+                        </motion.div>
+                      ))}
                     </div>
-
-                    {/* Matched Skills */}
-                    {matchResult.keywordsFound.map((skill, i) => (
-                      <motion.div
-                        key={`match-${skill}`}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.03 }}
-                        className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-gray-100 px-4 py-3 last:border-0 dark:border-gray-800"
-                      >
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-green-500" />
-                          <span className="text-sm font-medium capitalize text-gray-900 dark:text-white">
-                            {skill}
-                          </span>
-                        </div>
-                        <Badge variant="success" className="w-20 justify-center">
-                          Matched
-                        </Badge>
-                        <span className="w-24 text-center text-xs text-green-600 dark:text-green-400">
-                          ✓ You have this
-                        </span>
-                      </motion.div>
-                    ))}
-
-                    {/* Missing Skills */}
-                    {matchResult.missingKeywords.map((skill, i) => (
-                      <motion.div
-                        key={`miss-${skill}`}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{
-                          delay:
-                            matchResult.keywordsFound.length * 0.03 + i * 0.03,
-                        }}
-                        className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-gray-100 bg-red-50/30 px-4 py-3 last:border-0 dark:border-gray-800 dark:bg-red-900/5"
-                      >
-                        <div className="flex items-center gap-2">
-                          <XCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
-                          <span className="text-sm font-medium capitalize text-gray-900 dark:text-white">
-                            {skill}
-                          </span>
-                        </div>
-                        <Badge variant="danger" className="w-20 justify-center">
-                          Missing
-                        </Badge>
-                        <span className="w-24 text-center text-xs text-red-600 dark:text-red-400">
-                          ⚡ Learn this
-                        </span>
-                      </motion.div>
-                    ))}
                   </div>
                 </div>
 

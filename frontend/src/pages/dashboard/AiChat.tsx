@@ -70,8 +70,8 @@ export function AiChatPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">AI Resume Chat</h1>
-        <div className="mt-2 flex items-center gap-3">
+        <h1 className="text-xl font-bold text-gray-900 md:text-3xl dark:text-white">AI Resume Chat</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3">
           <select value={selectedResumeId} onChange={(e) => setSelectedResumeId(e.target.value)}
             className="flex h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
             {resumes.map((r) => <option key={r.id} value={r.id}>{r.fileName}</option>)}
@@ -84,35 +84,51 @@ export function AiChatPage() {
       <Card className="flex flex-1 flex-col overflow-hidden">
         <CardContent className="flex flex-1 flex-col overflow-hidden p-0">
           {/* Messages */}
-          <div className="flex-1 space-y-4 overflow-y-auto p-4 scrollbar-thin">
+          <div className="min-w-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-4 scrollbar-thin">
             {messages.map((msg, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl ${
-                  msg.role === "ai" ? "bg-gradient-to-br from-brand-500 to-purple-500 text-white" : "bg-gray-200 dark:bg-gray-700"}`}>
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex w-full min-w-0 gap-2 sm:gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+              >
+                <div
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                    msg.role === "ai" ? "bg-gradient-to-br from-brand-500 to-purple-500 text-white" : "bg-gray-200 dark:bg-gray-700"
+                  }`}
+                >
                   {msg.role === "ai" ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4 text-gray-600 dark:text-gray-300" />}
                 </div>
-                <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                  msg.role === "ai"
-                    ? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
-                    : "bg-brand-600 text-white"}`}
-                  style={{ whiteSpace: "pre-wrap" }}>
-                  {msg.text.split("**").map((part, j) =>
-                    j % 2 === 1 ? <strong key={j}>{part}</strong> : <span key={j}>{part}</span>
-                  )}
+                <div
+                  className={`min-w-0 flex-1 ${msg.role === "user" ? "flex justify-end" : "flex justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[90%] min-w-0 break-words rounded-2xl px-4 py-3 text-sm leading-relaxed sm:max-w-[75%] ${
+                      msg.role === "ai"
+                        ? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+                        : "bg-brand-600 text-white"
+                    }`}
+                    style={{ whiteSpace: "pre-wrap" }}
+                  >
+                    {msg.text.split("**").map((part, j) =>
+                      j % 2 === 1 ? <strong key={j}>{part}</strong> : <span key={j}>{part}</span>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             ))}
             {isLoading && (
-              <div className="flex gap-3">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-purple-500 text-white">
+              <div className="flex w-full min-w-0 gap-2 sm:gap-4">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-purple-500 text-white">
                   <Bot className="h-4 w-4" />
                 </div>
-                <div className="rounded-2xl bg-gray-100 px-4 py-3 dark:bg-gray-800">
-                  <div className="flex gap-1">
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "0ms" }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "150ms" }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "300ms" }} />
+                <div className="min-w-0 flex-1">
+                  <div className="inline-block min-w-0 max-w-[90%] break-words rounded-2xl bg-gray-100 px-4 py-3 sm:max-w-[75%] dark:bg-gray-800">
+                    <div className="flex gap-1">
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "0ms" }} />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "150ms" }} />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "300ms" }} />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -43,15 +43,15 @@ function QuestionCard({ q, index }: { q: InterviewQuestion; index: number }) {
       transition={{ delay: index * 0.04 }}
     >
       <div
-        className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-5 transition-all hover:border-brand-200 hover:shadow-md dark:border-gray-700 dark:bg-gray-800/80 dark:hover:border-brand-800"
+        className="group min-w-0 cursor-pointer rounded-xl border border-gray-200 bg-white p-4 sm:p-5 transition-all hover:border-brand-200 hover:shadow-md dark:border-gray-700 dark:bg-gray-800/80 dark:hover:border-brand-800"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-purple-500 text-xs font-bold text-white">
               {index + 1}
             </div>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <div className="mb-2">
                 <span
                   className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${categoryColors[q.category] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"}`}
@@ -59,7 +59,7 @@ function QuestionCard({ q, index }: { q: InterviewQuestion; index: number }) {
                   {q.category}
                 </span>
               </div>
-              <p className="text-sm font-medium leading-relaxed text-gray-900 dark:text-slate-200">
+              <p className="break-words text-sm font-medium leading-relaxed text-gray-900 dark:text-slate-200">
                 {q.question}
               </p>
             </div>
@@ -170,8 +170,8 @@ export function InterviewPrepPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+    <div className="mx-auto flex w-full min-w-0 max-w-full flex-col space-y-6 overflow-x-hidden">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="min-w-0">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Interview Preparation
         </h1>
@@ -181,7 +181,7 @@ export function InterviewPrepPage() {
       </motion.div>
 
       {/* Generator Card */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="min-w-0">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -193,11 +193,11 @@ export function InterviewPrepPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-4">
               <select
                 value={selectedResumeId}
                 onChange={(e) => setSelectedResumeId(e.target.value)}
-                className="flex h-10 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                className="h-10 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 sm:flex-1 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               >
                 {resumes.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -208,7 +208,7 @@ export function InterviewPrepPage() {
               <Button
                 onClick={handleGenerate}
                 isLoading={isGenerating}
-                className="gap-2 shadow-lg shadow-brand-500/25"
+                className="w-full shrink-0 gap-2 shadow-lg shadow-brand-500/25 sm:w-auto"
               >
                 <MessageSquareQuote className="h-4 w-4" />
                 Generate Questions
@@ -220,10 +220,10 @@ export function InterviewPrepPage() {
 
       {/* Results — Tabbed Interface */}
       {questions.length > 0 && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-          {/* Tab Bar */}
-          <Card className="overflow-hidden">
-            <div className="flex border-b border-gray-200 dark:border-gray-700">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 space-y-4">
+          {/* Tab Bar — horizontal scroll on narrow screens, equal tabs from sm+ */}
+          <Card className="min-w-0 overflow-hidden">
+            <div className="flex w-full min-w-0 flex-nowrap gap-0 overflow-x-auto overflow-y-hidden border-b border-gray-200 px-1 scrollbar-thin sm:px-0 dark:border-gray-700">
               {categories.map((cat) => {
                 const isActive = filterCategory === cat;
                 const count = cat === "All" ? questions.length : questions.filter((q) => q.category === cat).length;
@@ -231,7 +231,7 @@ export function InterviewPrepPage() {
                   <button
                     key={cat}
                     onClick={() => setFilterCategory(cat)}
-                    className={`relative flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                    className={`relative min-w-[5.5rem] flex-shrink-0 px-3 py-3 text-left text-sm font-medium transition-colors sm:min-w-0 sm:flex-1 sm:px-4 sm:text-center ${
                       isActive
                         ? "text-brand-600 dark:text-brand-400"
                         : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -259,7 +259,7 @@ export function InterviewPrepPage() {
             </div>
 
             {/* Tab Content — animated on switch */}
-            <div className="p-4 lg:p-6">
+            <div className="w-full min-w-0 px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={filterCategory}
@@ -267,7 +267,7 @@ export function InterviewPrepPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.2 }}
-                  className="space-y-3"
+                  className="flex w-full min-w-0 flex-col space-y-3"
                 >
                   {filteredQuestions.map((q, i) => (
                     <QuestionCard key={`${q.category}-${i}`} q={q} index={i} />
@@ -316,8 +316,8 @@ function InterviewCoach({ resumes, selectedResumeId }: { resumes: Resume[]; sele
   if (resumes.length === 0) return null;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="space-y-4">
-      <Card className="overflow-hidden border-indigo-500/20">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="min-w-0 space-y-4">
+      <Card className="min-w-0 overflow-hidden border-indigo-500/20">
         <CardHeader className="bg-gradient-to-r from-indigo-500/[0.06] to-purple-500/[0.06]">
           <CardTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5 text-indigo-500" />
@@ -328,19 +328,23 @@ function InterviewCoach({ resumes, selectedResumeId }: { resumes: Resume[]; sele
             Paste a job description to predict the exact interview questions you'll face
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
+        <CardContent className="w-full min-w-0 space-y-4">
+          <div className="min-w-0 space-y-1.5">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Target Job Description</label>
             <textarea
               value={jd}
               onChange={(e) => setJd(e.target.value)}
               placeholder="Paste the job description you're applying for..."
               rows={4}
-              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              className="w-full min-w-0 resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
-          <Button className="gap-2 shadow-lg shadow-indigo-500/25" onClick={handleGenerate}
-            isLoading={isLoading} disabled={!selectedResumeId || !jd.trim()}>
+          <Button
+            className="w-full gap-2 shadow-lg shadow-indigo-500/25 sm:w-auto"
+            onClick={handleGenerate}
+            isLoading={isLoading}
+            disabled={!selectedResumeId || !jd.trim()}
+          >
             <Target className="h-4 w-4" /> Predict My Interview Questions
           </Button>
         </CardContent>
@@ -348,12 +352,12 @@ function InterviewCoach({ resumes, selectedResumeId }: { resumes: Resume[]; sele
 
       {/* Predicted Questions — Accordion */}
       {predicted.length > 0 && (
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="text-base">🎯 Predicted Questions ({predicted.length})</CardTitle>
             <CardDescription>Click a question to reveal the ideal answer strategy</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="w-full min-w-0 space-y-3">
             {predicted.map((q, i) => {
               const isOpen = expandedIdx === i;
               return (
