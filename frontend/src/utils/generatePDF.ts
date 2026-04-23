@@ -50,7 +50,6 @@ export async function generatePDFFromElement(
     });
 
     const imgWidth = A4_WIDTH_MM;
-    const imgHeight = (canvas.height * A4_WIDTH_MM) / canvas.width;
 
     // ── 4. Multi-page: slice the canvas into A4-height segments ──
     const pageHeightPx = (A4_HEIGHT_MM / A4_WIDTH_MM) * canvas.width;

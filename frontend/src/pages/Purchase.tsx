@@ -275,10 +275,10 @@ function SuccessStep({ plan }: { plan: typeof PLANS[0] }) {
   const { loadUser } = useAuth();
 
   useEffect(() => {
-    loadUser(); // refresh credits
+    void loadUser();
     const t = setTimeout(() => navigate("/dashboard"), 4000);
     return () => clearTimeout(t);
-  }, []);
+  }, [loadUser, navigate]);
 
   return (
     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="py-12 text-center">
@@ -308,7 +308,7 @@ export function PurchasePage() {
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-gray-50 dark:bg-slate-950">
       {/* Top bar */}
-      <div className="border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-800 dark:bg-slate-900">
+      <div className="border-b border-gray-200 bg-white px-3 py-4 sm:px-4 md:px-6 lg:px-8 dark:border-gray-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600">
@@ -322,7 +322,7 @@ export function PurchasePage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mx-auto max-w-5xl px-3 py-8 sm:px-4 md:px-6 lg:px-8">
         <Steps current={step} />
 
         <AnimatePresence mode="wait">

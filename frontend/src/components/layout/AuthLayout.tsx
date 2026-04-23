@@ -43,7 +43,7 @@ export function AuthLayout() {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex w-full items-center justify-center bg-white p-6 dark:bg-gray-900 lg:w-1/2">
+      <div className="flex w-full items-center justify-center bg-white p-3 sm:p-4 md:p-6 lg:p-8 dark:bg-gray-900 lg:w-1/2">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}

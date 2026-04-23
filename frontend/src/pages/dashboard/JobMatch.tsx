@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  Sparkles,
   ArrowRight,
   Upload,
   TrendingUp,

@@ -20,28 +20,6 @@ export function SocialAuthButtons() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
-  const sendCredentialToBackend = async (credential: string) => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/auth/google`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
-      });
-      const data = await res.json();
-      if (!res.ok) { toast.error(data.message || "Google sign-in failed"); return; }
-
-      localStorage.setItem(TOKEN_KEY, data.token);
-      useAuth.setState({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
-      toast.success(`Welcome${data.user?.name ? `, ${data.user.name.split(" ")[0]}` : ""}! 🎉`);
-      navigate("/dashboard");
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const googleLogin = useGoogleLogin({
     flow: "implicit",
     onSuccess: async (tokenResponse) => {

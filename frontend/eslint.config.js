@@ -20,4 +20,14 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    files: [
+      'src/components/ui/**/*.tsx',
+      'src/components/ProGate.tsx',
+      'src/routes/**/*.tsx',
+    ],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

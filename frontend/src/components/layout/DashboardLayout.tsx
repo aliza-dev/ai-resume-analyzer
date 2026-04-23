@@ -3,7 +3,6 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Navbar } from "./Navbar";
 import { DashboardTopBar } from "./DashboardTopBar";
-import { FeedbackButton } from "@/components/FeedbackModal";
 
 export function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -21,13 +20,10 @@ export function DashboardLayout() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <DashboardTopBar />
-        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4 py-4 lg:px-6 lg:py-6 scrollbar-thin">
+        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6 lg:px-8 lg:py-7 scrollbar-thin">
           <Outlet />
         </main>
       </div>
-
-      {/* Floating feedback button — visible on all dashboard pages */}
-      <FeedbackButton />
     </div>
   );
 }

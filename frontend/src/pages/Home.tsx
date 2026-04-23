@@ -351,7 +351,7 @@ export function HomePage() {
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-slate-950 text-white selection:bg-indigo-500/30">
       {/* ── FLOATING NAVBAR ─────────────────────────────────────── */}
-      <nav className="fixed inset-x-0 top-4 z-50 mx-auto max-w-6xl px-4">
+      <nav className="fixed inset-x-0 top-4 z-50 mx-auto max-w-6xl px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="flex items-center justify-between rounded-2xl border border-white/[0.08] bg-slate-900/70 px-5 py-3 shadow-xl shadow-black/20 backdrop-blur-xl">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5">
@@ -387,7 +387,7 @@ export function HomePage() {
       </nav>
 
       {/* ── HERO ────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden px-6 pb-10 pt-36 lg:pt-44">
+      <section className="relative overflow-hidden px-3 pb-10 pt-36 sm:px-4 md:px-6 lg:px-8 lg:pt-44">
         {/* Ambient glow orbs */}
         <div className="pointer-events-none absolute inset-0 -z-10">
           <div className="absolute left-1/2 top-0 h-[700px] w-[700px] -translate-x-1/2 rounded-full bg-indigo-600/15 blur-[120px]" />
@@ -436,7 +436,7 @@ export function HomePage() {
       </section>
 
       {/* ── SOCIAL PROOF (Stats) ─────────────────────────────────── */}
-      <Section className="border-y border-white/[0.06] bg-white/[0.02] px-6 py-14">
+      <Section className="border-y border-white/[0.06] bg-white/[0.02] px-3 py-14 sm:px-4 md:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <motion.p variants={fadeUp} custom={0} className="mb-8 text-center text-sm tracking-wide text-gray-500">
             TRUSTED BY PROFESSIONALS FROM TOP TECH COMPANIES
@@ -453,7 +453,7 @@ export function HomePage() {
       </Section>
 
       {/* ── FEATURES (Bento Grid) ────────────────────────────────── */}
-      <Section id="features" className="px-6 py-24">
+      <Section id="features" className="px-3 py-24 sm:px-4 md:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
           <motion.div variants={fadeUp} custom={0} className="mb-14 text-center">
             <span className="mb-3 inline-block rounded-full bg-indigo-500/10 px-4 py-1 text-xs font-semibold tracking-wider text-indigo-400">
@@ -488,7 +488,7 @@ export function HomePage() {
       </Section>
 
       {/* ── HOW IT WORKS ─────────────────────────────────────────── */}
-      <Section id="how-it-works" className="border-t border-white/[0.06] bg-white/[0.02] px-6 py-24">
+      <Section id="how-it-works" className="border-t border-white/[0.06] bg-white/[0.02] px-3 py-24 sm:px-4 md:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <motion.div variants={fadeUp} custom={0} className="mb-16 text-center">
             <span className="mb-3 inline-block rounded-full bg-purple-500/10 px-4 py-1 text-xs font-semibold tracking-wider text-purple-400">
@@ -517,7 +517,7 @@ export function HomePage() {
       </Section>
 
       {/* ── TESTIMONIALS ─────────────────────────────────────────── */}
-      <Section className="px-6 py-24">
+      <Section className="px-3 py-24 sm:px-4 md:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
           <motion.div variants={fadeUp} custom={0} className="mb-14 text-center">
             <span className="mb-3 inline-block rounded-full bg-amber-500/10 px-4 py-1 text-xs font-semibold tracking-wider text-amber-400">
@@ -554,7 +554,7 @@ export function HomePage() {
       </Section>
 
       {/* ── FINAL CTA ────────────────────────────────────────────── */}
-      <Section className="relative overflow-hidden px-6 py-24">
+      <Section className="relative overflow-hidden px-3 py-24 sm:px-4 md:px-6 lg:px-8">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-purple-600/10 to-transparent" />
           <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-500/10 blur-[120px]" />
@@ -587,7 +587,7 @@ export function HomePage() {
       </Section>
 
       {/* ── FOOTER ───────────────────────────────────────────────── */}
-      <footer className="border-t border-white/[0.06] px-6 py-10">
+      <footer className="border-t border-white/[0.06] px-3 py-10 sm:px-4 md:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600">

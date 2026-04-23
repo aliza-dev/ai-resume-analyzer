@@ -30,6 +30,12 @@ const freePlan = {
   ],
 };
 
+interface StripeCheckoutResponse {
+  id?: string;
+  url?: string;
+  message?: string;
+}
+
 const proPlan = {
   name: "Pro",
   price: "$4.99",
@@ -53,7 +59,9 @@ export function PricingPage() {
   const isPro = user?.isPro === true;
   const [isUpgrading, setIsUpgrading] = useState(false);
 
-  useEffect(() => { loadUser(); }, []);
+  useEffect(() => {
+    void loadUser();
+  }, [loadUser]);
 
   const handleUpgrade = async () => {
     // Track Payment Click Event
@@ -86,12 +94,12 @@ export function PricingPage() {
       }
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
+        const errData = (await res.json().catch(() => ({}))) as { message?: string };
         toast.error(errData.message || "Failed to create checkout session");
         return;
       }
 
-      const data = await res.json();
+      const data = (await res.json()) as StripeCheckoutResponse;
 
       if (stripePromise && data.id) {
         const stripe = await stripePromise;
@@ -100,7 +108,6 @@ export function PricingPage() {
           return;
         }
 
-        // @ts-ignore
         const { error } = await stripe.redirectToCheckout({ sessionId: data.id });
         if (error) {
           toast.error(error.message || "Checkout redirect failed");
@@ -110,7 +117,7 @@ export function PricingPage() {
       } else {
         toast.error("Failed to start checkout. Please try again.");
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to connect to payment server. Please try again.");
     } finally {
       setIsUpgrading(false);
@@ -119,7 +126,7 @@ export function PricingPage() {
 
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-slate-950 text-white">
-      <nav className="flex items-center justify-between px-6 py-5">
+      <nav className="flex items-center justify-between px-3 py-5 sm:px-4 md:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
             <Brain className="h-5 w-5 text-white" />
@@ -133,7 +140,7 @@ export function PricingPage() {
         </Link>
       </nav>
 
-      <div className="relative overflow-hidden px-6 pb-10 pt-10 text-center">
+      <div className="relative overflow-hidden px-3 pb-10 pt-10 text-center sm:px-4 md:px-6 lg:px-8">
         <div className="pointer-events-none absolute inset-0 -z-10">
           <div className="absolute left-1/2 top-0 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-indigo-600/15 blur-[120px]" />
         </div>
@@ -149,7 +156,7 @@ export function PricingPage() {
         </motion.div>
       </div>
 
-      <div className="mx-auto grid max-w-4xl gap-6 px-6 pb-24 md:grid-cols-2">
+      <div className="mx-auto grid max-w-4xl gap-6 px-3 pb-24 sm:px-4 md:grid-cols-2 md:px-6 lg:px-8">
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={1}
           className="flex flex-col rounded-2xl border border-white/[0.06] bg-white/[0.03] p-8">
           <div className="mb-6">

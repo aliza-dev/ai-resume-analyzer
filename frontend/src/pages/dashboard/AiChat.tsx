@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Bot, Send, User, Upload, Sparkles } from "lucide-react";
+import { Bot, Send, User, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { resumeApi } from "@/api/resume";
 import type { Resume } from "@/types";
@@ -80,11 +80,11 @@ export function AiChatPage() {
         </div>
       </motion.div>
 
-      {/* Chat Area */}
-      <Card className="flex flex-1 flex-col overflow-hidden">
-        <CardContent className="flex flex-1 flex-col overflow-hidden p-0">
-          {/* Messages */}
-          <div className="min-w-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-4 scrollbar-thin">
+      {/* Chat Area — on mobile, composer is fixed to bottom; messages have extra bottom padding so nothing hides behind it */}
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+          {/* Messages + suggestions (scroll) */}
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-4 pb-28 max-md:pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] md:pb-4 scrollbar-thin">
             {messages.map((msg, i) => (
               <motion.div
                 key={i}
@@ -134,29 +134,39 @@ export function AiChatPage() {
               </div>
             )}
             <div ref={chatEndRef} />
+
+            {messages.length <= 2 && (
+              <div className="border-t border-gray-100 pt-4 dark:border-gray-700">
+                <p className="mb-2 text-xs font-medium text-gray-500">Quick questions:</p>
+                <div className="flex flex-wrap gap-2">
+                  {SUGGESTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => handleSend(s)}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1 text-left text-xs text-gray-700 transition-all hover:border-brand-300 hover:bg-brand-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-brand-600"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Quick Suggestions */}
-          {messages.length <= 2 && (
-            <div className="border-t border-gray-100 px-4 py-3 dark:border-gray-700">
-              <p className="mb-2 text-xs font-medium text-gray-500">Quick questions:</p>
-              <div className="flex flex-wrap gap-2">
-                {SUGGESTIONS.map((s) => (
-                  <button key={s} onClick={() => handleSend(s)}
-                    className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-700 transition-all hover:border-brand-300 hover:bg-brand-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-brand-600">
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Input */}
-          <div className="border-t border-gray-200 p-4 dark:border-gray-700">
-            <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="flex gap-2">
-              <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about your resume..."
-                className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" />
-              <Button type="submit" disabled={!input.trim() || isLoading} className="rounded-xl shadow-lg shadow-brand-500/25">
+          {/* Composer — fixed to viewport bottom on small screens only */}
+          <div
+            className="shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-slate-900 max-md:fixed max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:z-20 max-md:border-t max-md:bg-white/85 max-md:backdrop-blur-md max-md:dark:bg-slate-950/85 md:static md:bg-white md:backdrop-blur-none md:dark:bg-slate-900"
+            style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+          >
+            <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="mx-auto flex max-w-full gap-2">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask about your resume..."
+                className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              />
+              <Button type="submit" disabled={!input.trim() || isLoading} className="shrink-0 rounded-xl shadow-lg shadow-brand-500/25">
                 <Send className="h-4 w-4" />
               </Button>
             </form>

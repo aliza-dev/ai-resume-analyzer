@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Upload, FileSearch, Briefcase,
   MessageSquareQuote, PenLine, GitCompareArrows,
   Bot, Eye, Rocket, Mic, User, History, X, Brain,
+  MessageSquareHeart,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { FeedbackModal } from "@/components/FeedbackModal";
 import type { LucideIcon } from "lucide-react";
 
 interface NavItem { to: string; icon: LucideIcon; label: string }
@@ -55,6 +58,8 @@ const navSections: NavSection[] = [
 interface SidebarProps { isOpen: boolean; onClose: () => void; }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
   return (
     <>
       <AnimatePresence>
@@ -100,27 +105,47 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               {/* Section Links */}
               <div className="space-y-0.5">
                 {section.items.map((item) => (
-                  <NavLink key={item.to} to={item.to} onClick={onClose}
-                    className={({ isActive }) => cn(
-                      "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-all duration-200",
-                      isActive
-                        ? "bg-brand-50 text-brand-700 dark:bg-indigo-500/10 dark:text-indigo-300"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
-                    )}>
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={onClose}
+                    className={({ isActive }) =>
+                      cn(
+                        "group relative flex items-center gap-3 border-l-[3px] py-2 pl-[9px] pr-3 text-[13px] font-medium transition-all duration-200",
+                        isActive
+                          ? "border-l-indigo-600 bg-indigo-50 text-indigo-900 shadow-sm dark:border-l-indigo-400 dark:bg-white/10 dark:text-indigo-100"
+                          : "border-l-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                      )
+                    }
+                  >
                     {({ isActive }) => (
                       <>
-                        {isActive && (
-                          <motion.div layoutId="sidebar-active"
-                            className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-indigo-400 to-purple-500"
-                            transition={{ type: "spring", damping: 20, stiffness: 300 }} />
-                        )}
-                        <item.icon className={cn("h-[18px] w-[18px] transition-transform duration-200 group-hover:scale-110",
-                          isActive && "text-indigo-500 dark:text-indigo-400")} />
-                        {item.label}
+                        <item.icon
+                          className={cn(
+                            "h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110",
+                            isActive
+                              ? "text-indigo-600 dark:text-indigo-300"
+                              : "text-gray-500 group-hover:text-gray-700 dark:text-gray-500 dark:group-hover:text-gray-200"
+                          )}
+                        />
+                        <span className="min-w-0 flex-1">{item.label}</span>
                       </>
                     )}
                   </NavLink>
                 ))}
+                {section.title === "Account" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFeedbackOpen(true);
+                      onClose();
+                    }}
+                    className="group relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px] font-medium text-gray-600 transition-all duration-200 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                  >
+                    <MessageSquareHeart className="h-[18px] w-[18px] text-indigo-500/80 transition-transform duration-200 group-hover:scale-110 dark:text-indigo-400" />
+                    Send feedback
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -134,6 +159,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         </div>
       </aside>
+
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </>
   );
 }

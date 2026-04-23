@@ -315,7 +315,7 @@ export function ResumeAnalysisPage() {
         })
         .finally(() => setIsLoading(false));
     }
-  }, [resumeId, isSample]);
+  }, [resumeId, isSample, location.state]);
 
   const LOADING_STAGES = [
     "Extracting text from resume...",

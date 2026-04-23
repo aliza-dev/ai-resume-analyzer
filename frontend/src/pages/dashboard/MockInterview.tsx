@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mic, Send, Upload, CheckCircle2, XCircle, ChevronRight, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { resumeApi } from "@/api/resume";
@@ -114,71 +114,136 @@ export function MockInterviewPage() {
         </motion.div>
       )}
 
-      {/* Interview In Progress */}
+      {/* Interview In Progress — on mobile, answer/submit (or next) is fixed to bottom with blur */}
       {currentQ && !isFinished && (
         <AnimatePresence mode="wait">
-          <motion.div key={currentIdx} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="space-y-4">
-            {/* Progress */}
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">Question {currentIdx + 1} of {questions.length}</span>
-              {totalScore.length > 0 && <Badge variant="default">Avg Score: {avgScore}%</Badge>}
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-              <motion.div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-purple-500"
-                animate={{ width: `${((currentIdx + 1) / questions.length) * 100}%` }} />
+          <motion.div
+            key={currentIdx}
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -30 }}
+            className="flex min-h-0 flex-col space-y-4 max-md:min-h-[50vh] max-md:pb-0"
+          >
+            <div className="min-h-0 max-md:flex-1 max-md:overflow-y-auto max-md:pb-[calc(13rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+              {/* Progress */}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">Question {currentIdx + 1} of {questions.length}</span>
+                {totalScore.length > 0 && <Badge variant="default">Avg Score: {avgScore}%</Badge>}
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                <motion.div
+                  className="h-full rounded-full bg-gradient-to-r from-brand-500 to-purple-500"
+                  animate={{ width: `${((currentIdx + 1) / questions.length) * 100}%` }}
+                />
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <Badge variant="default" className="mb-2 w-fit">{currentQ.category}</Badge>
+                  <CardTitle className="text-lg">{currentQ.question}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <textarea
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="Type your answer here... (Use the STAR method: Situation, Task, Action, Result)"
+                    rows={6}
+                    disabled={!!evaluation}
+                    className="hidden w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:block"
+                  />
+
+                  {!evaluation ? (
+                    <Button
+                      onClick={submitAnswer}
+                      isLoading={isEvaluating}
+                      disabled={!answer.trim()}
+                      className="hidden w-full gap-2 shadow-lg shadow-brand-500/25 md:inline-flex"
+                    >
+                      <Send className="h-4 w-4" /> Submit Answer
+                    </Button>
+                  ) : (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                      <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-brand-50 to-purple-50 p-4 dark:from-brand-900/20 dark:to-purple-900/20">
+                        <div>
+                          <p className="text-xs text-gray-500">Your Score</p>
+                          <p className="text-3xl font-bold text-brand-600">{evaluation.score}%</p>
+                        </div>
+                        <Badge variant={evaluation.score >= 70 ? "success" : evaluation.score >= 50 ? "warning" : "danger"} className="text-sm">
+                          {evaluation.grade}
+                        </Badge>
+                      </div>
+
+                      {evaluation.strengths.length > 0 && (
+                        <div className="space-y-1">
+                          {evaluation.strengths.map((s, i) => (
+                            <div key={i} className="flex items-start gap-2 text-xs">
+                              <CheckCircle2 className="mt-0.5 h-3 w-3 text-green-500" />
+                              <span className="text-green-700 dark:text-green-400">{renderMarkdown(s)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {evaluation.feedback.length > 0 && (
+                        <div className="space-y-1">
+                          {evaluation.feedback.map((f, i) => (
+                            <div key={i} className="flex items-start gap-2 text-xs">
+                              <XCircle className="mt-0.5 h-3 w-3 text-red-500" />
+                              <span className="text-red-700 dark:text-red-400">{renderMarkdown(f)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <Button onClick={nextQuestion} className="hidden w-full gap-2 md:inline-flex">
+                        {currentIdx < questions.length - 1 ? (
+                          <>
+                            <ChevronRight className="h-4 w-4" /> Next Question
+                          </>
+                        ) : (
+                          <>Finish Interview</>
+                        )}
+                      </Button>
+                    </motion.div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Question */}
-            <Card>
-              <CardHeader>
-                <Badge variant="default" className="mb-2 w-fit">{currentQ.category}</Badge>
-                <CardTitle className="text-lg">{currentQ.question}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <textarea value={answer} onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="Type your answer here... (Use the STAR method: Situation, Task, Action, Result)"
-                  rows={6} disabled={!!evaluation}
-                  className="w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" />
-
-                {!evaluation ? (
-                  <Button onClick={submitAnswer} isLoading={isEvaluating} disabled={!answer.trim()} className="w-full gap-2 shadow-lg shadow-brand-500/25">
+            {/* Mobile: fixed answer / next area */}
+            <div
+              className="z-20 border-t border-gray-200 bg-white/85 p-4 backdrop-blur-md dark:border-gray-700 dark:bg-slate-950/85 max-md:fixed max-md:bottom-0 max-md:left-0 max-md:right-0 md:hidden"
+              style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+            >
+              {!evaluation ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="Type your answer (STAR: Situation, Task, Action, Result)..."
+                    rows={4}
+                    className="w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  />
+                  <Button
+                    onClick={submitAnswer}
+                    isLoading={isEvaluating}
+                    disabled={!answer.trim()}
+                    className="w-full gap-2 shadow-lg shadow-brand-500/25"
+                  >
                     <Send className="h-4 w-4" /> Submit Answer
                   </Button>
-                ) : (
-                  /* Evaluation Result */
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-                    <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-brand-50 to-purple-50 p-4 dark:from-brand-900/20 dark:to-purple-900/20">
-                      <div>
-                        <p className="text-xs text-gray-500">Your Score</p>
-                        <p className="text-3xl font-bold text-brand-600">{evaluation.score}%</p>
-                      </div>
-                      <Badge variant={evaluation.score >= 70 ? "success" : evaluation.score >= 50 ? "warning" : "danger"} className="text-sm">
-                        {evaluation.grade}
-                      </Badge>
-                    </div>
-
-                    {evaluation.strengths.length > 0 && (
-                      <div className="space-y-1">
-                        {evaluation.strengths.map((s, i) => (
-                          <div key={i} className="flex items-start gap-2 text-xs"><CheckCircle2 className="mt-0.5 h-3 w-3 text-green-500" /><span className="text-green-700 dark:text-green-400">{renderMarkdown(s)}</span></div>
-                        ))}
-                      </div>
-                    )}
-                    {evaluation.feedback.length > 0 && (
-                      <div className="space-y-1">
-                        {evaluation.feedback.map((f, i) => (
-                          <div key={i} className="flex items-start gap-2 text-xs"><XCircle className="mt-0.5 h-3 w-3 text-red-500" /><span className="text-red-700 dark:text-red-400">{renderMarkdown(f)}</span></div>
-                        ))}
-                      </div>
-                    )}
-
-                    <Button onClick={nextQuestion} className="w-full gap-2">
-                      {currentIdx < questions.length - 1 ? <><ChevronRight className="h-4 w-4" /> Next Question</> : <>Finish Interview</>}
-                    </Button>
-                  </motion.div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+              ) : (
+                <Button onClick={nextQuestion} className="w-full gap-2">
+                  {currentIdx < questions.length - 1 ? (
+                    <>
+                      <ChevronRight className="h-4 w-4" /> Next Question
+                    </>
+                  ) : (
+                    <>Finish Interview</>
+                  )}
+                </Button>
+              )}
+            </div>
           </motion.div>
         </AnimatePresence>
       )}

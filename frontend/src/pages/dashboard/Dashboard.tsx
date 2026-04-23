@@ -183,7 +183,7 @@ export function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
+        {stats.map((stat) => (
           <motion.div key={stat.label} variants={itemVariants}>
             <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-indigo-500/30">
               <div
