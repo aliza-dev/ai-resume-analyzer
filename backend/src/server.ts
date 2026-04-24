@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Router } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -42,6 +42,12 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// API — after CORS + body parsers, before morgan / static (statsRouter: GET /api/platform-stats)
+const apiRouter = Router();
+apiRouter.use(statsRouter);
+apiRouter.use(routes);
+app.use("/api", apiRouter);
+
 // Logging
 if (env.NODE_ENV === "development") {
   app.use(morgan("dev"));
@@ -61,10 +67,6 @@ app.get("/", (_req, res) => {
     docs: "/api",
   });
 });
-
-// API Routes — stats mounted first so GET /api/platform-stats is not shadowed
-app.use("/api", statsRouter);
-app.use("/api", routes);
 
 // Error handling
 app.use(errorHandler);
