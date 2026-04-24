@@ -362,8 +362,22 @@ export function HomePage() {
         const response = await fetch(`${API_BASE_URL}/platform-stats`);
         const result = await response.json();
         
-        if (result.success && result.data) {
-          setPlatformStats(result.data);
+        if (result.success && result.data && typeof result.data === "object") {
+          const d = result.data as {
+            users?: number;
+            resumesAnalyzed?: number;
+            accuracy?: number;
+            rating?: number;
+          };
+          setPlatformStats((prev) => ({
+            ...prev,
+            // Map API fields 1:1 — no offset or min/max; missing keys keep previous values
+            users: d.users != null ? Number(d.users) : prev.users,
+            resumesAnalyzed:
+              d.resumesAnalyzed != null ? Number(d.resumesAnalyzed) : prev.resumesAnalyzed,
+            accuracy: d.accuracy != null ? Number(d.accuracy) : prev.accuracy,
+            rating: d.rating != null ? Number(d.rating) : prev.rating,
+          }));
         }
       } catch (error) {
         console.error("Failed to load dynamic stats:", error);
@@ -381,7 +395,7 @@ export function HomePage() {
     return num.toString();
   };
 
-  // Generate the stats array dynamically for the render
+  // Generate the stats array dynamically — `users` is platformStats.users only (no offset)
   const dynamicStats = [
     { value: isLoadingStats ? "..." : `${formatNumber(platformStats.resumesAnalyzed)}+`, label: "Resumes Analyzed" },
     { value: `${platformStats.accuracy}%`, label: "ATS Accuracy" },

@@ -71,44 +71,69 @@ export function MockInterviewPage() {
   const currentQ = questions[currentIdx];
   const isFinished = questions.length > 0 && currentIdx >= questions.length;
 
-  if (isLoading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" /></div>;
+  if (isLoading) {
+    return (
+      <div className="mx-auto flex h-64 min-h-0 w-full min-w-0 max-w-4xl items-center justify-center overflow-x-hidden px-4 sm:px-6">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   if (resumes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <Mic className="mb-4 h-16 w-16 text-gray-300 dark:text-gray-600" />
-        <h2 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">No Resumes Found</h2>
-        <Link to="/upload"><Button className="gap-2"><Upload className="h-4 w-4" /> Upload Resume</Button></Link>
+      <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col items-center justify-center overflow-x-hidden px-4 py-20 sm:px-6">
+        <Mic className="mb-4 h-16 w-16 shrink-0 text-gray-300 dark:text-gray-600" />
+        <h2 className="mb-2 text-balance text-center text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">No Resumes Found</h2>
+        <Link to="/upload" className="w-full max-w-xs sm:max-w-none sm:w-auto">
+          <Button className="w-full gap-2 sm:w-auto">
+            <Upload className="h-4 w-4" /> Upload Resume
+          </Button>
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto w-full min-w-0 max-w-4xl space-y-6 overflow-x-hidden px-4 sm:px-6">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">AI Mock Interview</h1>
-        <p className="text-gray-500 dark:text-gray-400">Practice interviews with AI feedback on your answers</p>
+        <h1 className="text-balance text-2xl font-bold text-gray-900 dark:text-white sm:text-3xl">AI Mock Interview</h1>
+        <p className="text-balance text-sm text-gray-500 dark:text-gray-400 sm:text-base">
+          Practice interviews with AI feedback on your answers
+        </p>
       </motion.div>
 
       {/* Start Card */}
       {questions.length === 0 && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Card>
-            <CardContent className="flex flex-col items-center py-12 text-center">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full min-w-0">
+          <Card className="w-full min-w-0 max-w-full overflow-hidden">
+            <CardContent className="flex w-full min-w-0 flex-col items-center py-8 text-center sm:py-12">
               <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}>
-                <Mic className="mb-4 h-16 w-16 text-brand-500" />
+                <Mic className="mb-4 h-16 w-16 shrink-0 text-brand-500" />
               </motion.div>
-              <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">Ready to Practice?</h3>
-              <p className="mb-4 text-sm text-gray-500">AI will ask questions based on your resume. You type your answer, and AI evaluates it!</p>
-              <div className="mb-6 flex items-center gap-3">
-                <select value={selectedResumeId} onChange={(e) => setSelectedResumeId(e.target.value)}
-                  className="flex h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
-                  {resumes.map((r) => <option key={r.id} value={r.id}>{r.fileName}</option>)}
+              <h3 className="mb-2 text-balance text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">Ready to Practice?</h3>
+              <p className="mb-4 max-w-prose text-balance px-0 text-sm text-gray-500 sm:px-2 sm:text-base">
+                AI will ask questions based on your resume. You type your answer, and AI evaluates it!
+              </p>
+              <div className="mb-6 flex w-full min-w-0 flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center sm:justify-center">
+                <select
+                  value={selectedResumeId}
+                  onChange={(e) => setSelectedResumeId(e.target.value)}
+                  className="h-9 min-w-0 w-full rounded-lg border border-gray-300 bg-white px-3 text-left text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 sm:w-auto sm:min-w-48"
+                >
+                  {resumes.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.fileName}
+                    </option>
+                  ))}
                 </select>
+                <Button
+                  onClick={startInterview}
+                  isLoading={isGenerating}
+                  className="w-full min-w-0 gap-2 shadow-lg shadow-brand-500/25 sm:w-auto"
+                >
+                  <Mic className="h-4 w-4 shrink-0" /> Start Mock Interview
+                </Button>
               </div>
-              <Button onClick={startInterview} isLoading={isGenerating} className="gap-2 shadow-lg shadow-brand-500/25">
-                <Mic className="h-4 w-4" /> Start Mock Interview
-              </Button>
             </CardContent>
           </Card>
         </motion.div>
@@ -122,9 +147,9 @@ export function MockInterviewPage() {
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -30 }}
-            className="flex min-h-0 flex-col space-y-4 max-md:min-h-[50vh] max-md:pb-0"
+            className="flex min-h-0 w-full min-w-0 max-w-full flex-col space-y-4 overflow-x-hidden max-md:min-h-[50vh] max-md:pb-0"
           >
-            <div className="min-h-0 max-md:flex-1 max-md:overflow-y-auto max-md:pb-[calc(13rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+            <div className="min-h-0 w-full min-w-0 max-md:flex-1 max-md:overflow-y-auto max-md:overflow-x-hidden max-md:pb-[calc(13rem+env(safe-area-inset-bottom,0px))] md:pb-0">
               {/* Progress */}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">Question {currentIdx + 1} of {questions.length}</span>
@@ -211,7 +236,7 @@ export function MockInterviewPage() {
 
             {/* Mobile: fixed answer / next area */}
             <div
-              className="z-20 border-t border-gray-200 bg-white/85 p-4 backdrop-blur-md dark:border-gray-700 dark:bg-slate-950/85 max-md:fixed max-md:bottom-0 max-md:left-0 max-md:right-0 md:hidden"
+              className="z-20 w-full min-w-0 max-w-full border-t border-gray-200 bg-white/85 p-4 backdrop-blur-md dark:border-gray-700 dark:bg-slate-950/85 max-md:fixed max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:overflow-x-hidden md:hidden"
               style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
             >
               {!evaluation ? (
@@ -250,8 +275,12 @@ export function MockInterviewPage() {
 
       {/* Finished */}
       {isFinished && (
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-          <Card>
+        <motion.div
+          className="w-full min-w-0 max-w-full overflow-x-hidden"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <Card className="w-full min-w-0 max-w-full overflow-hidden">
             <CardContent className="flex flex-col items-center py-12 text-center">
               <span className="mb-4 text-6xl">🎉</span>
               <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">Interview Complete!</h3>
