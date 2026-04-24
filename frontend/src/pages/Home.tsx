@@ -353,10 +353,12 @@ export function HomePage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Vite mein .env variables access karne ka tareeqa:
-        const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-        
-        // Kyunke VITE_API_URL ke aakhir mein pehle se '/api' hai, hum sirf '/platform-stats' lagayenge
+        // API_BASE_URL always ends with exactly .../api (no trailing slash) — no /api//platform-stats
+        const raw = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(
+          /\/+$/,
+          ""
+        );
+        const API_BASE_URL = raw.endsWith("/api") ? raw : `${raw}/api`;
         const response = await fetch(`${API_BASE_URL}/platform-stats`);
         const result = await response.json();
         
