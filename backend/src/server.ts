@@ -7,7 +7,7 @@ import path from "path";
 
 import { env } from "./config/env";
 import routes from "./routes";
-import statsRoutes from "./routes/stats.routes";
+import statsRouter from "./routes/stats.routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
@@ -62,9 +62,9 @@ app.get("/", (_req, res) => {
   });
 });
 
-// API Routes
+// API Routes — stats mounted first so GET /api/platform-stats is not shadowed
+app.use("/api", statsRouter);
 app.use("/api", routes);
-app.use("/api", statsRoutes);
 
 // Error handling
 app.use(errorHandler);

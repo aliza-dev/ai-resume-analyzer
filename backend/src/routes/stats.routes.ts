@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import prisma from "../config/database";
 
-const router = Router();
+const statsRouter = Router();
 
 type StatsPayload = {
   users: number;
@@ -10,7 +10,7 @@ type StatsPayload = {
   rating: number;
 };
 
-router.get("/platform-stats", async (_req: Request, res: Response) => {
+statsRouter.get("/platform-stats", async (_req: Request, res: Response) => {
   try {
     const totalUsers = await prisma.user.count();
 
@@ -35,4 +35,4 @@ router.get("/platform-stats", async (_req: Request, res: Response) => {
   }
 });
 
-export default router;
+export default statsRouter;
