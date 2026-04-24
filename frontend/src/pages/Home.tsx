@@ -338,66 +338,109 @@ const steps = [
   { num: "03", icon: Target, title: "Get Hired", desc: "Match with jobs, prep for interviews, and land offers faster." },
 ];
 
+/** If /api/platform-stats fails, these values keep the section usable (not broken UI). */
+const FALLBACK_PLATFORM_STATS = {
+  users: 0,
+  resumesAnalyzed: 0,
+  accuracy: 98,
+  rating: 4.9,
+} as const;
+
 /* ═══════════════════════════════════════════════════════════════════
  * Page
  * ═══════════════════════════════════════════════════════════════════ */
 export function HomePage() {
-  // --- Dynamic Stats Logic Starts Here ---
-  const [platformStats, setPlatformStats] = useState({
-    resumesAnalyzed: 0,
-    accuracy: 98, // Algorithm accuracy is fixed
-    users: 0,
-    rating: 4.9 // Manual rating for now
-  });
+  // --- Platform stats: live from GET /api/platform-stats (Prisma user + resume counts) ---
+  const [platformStats, setPlatformStats] = useState<{
+    users: number;
+    resumesAnalyzed: number;
+    accuracy: number;
+    rating: number;
+  }>({ ...FALLBACK_PLATFORM_STATS });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchStats = async () => {
+      setIsLoadingStats(true);
       try {
-        const response = await fetch(`${API_URL}/platform-stats`);
-        const result = await response.json();
-        
-        if (result.success && result.data && typeof result.data === "object") {
-          const d = result.data as {
+        const response = await fetch(`${API_URL}/platform-stats`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        const result = (await response.json()) as {
+          success?: boolean;
+          data?: {
             users?: number;
             resumesAnalyzed?: number;
             accuracy?: number;
             rating?: number;
           };
-          setPlatformStats((prev) => ({
-            ...prev,
-            // Map API fields 1:1 — no offset or min/max; missing keys keep previous values
-            users: d.users != null ? Number(d.users) : prev.users,
-            resumesAnalyzed:
-              d.resumesAnalyzed != null ? Number(d.resumesAnalyzed) : prev.resumesAnalyzed,
-            accuracy: d.accuracy != null ? Number(d.accuracy) : prev.accuracy,
-            rating: d.rating != null ? Number(d.rating) : prev.rating,
-          }));
+        };
+
+        if (!response.ok || !result.success || !result.data || typeof result.data !== "object") {
+          setPlatformStats({ ...FALLBACK_PLATFORM_STATS });
+          return;
         }
+
+        const d = result.data;
+        setPlatformStats({
+          users: d.users != null && Number.isFinite(Number(d.users)) ? Number(d.users) : FALLBACK_PLATFORM_STATS.users,
+          resumesAnalyzed:
+            d.resumesAnalyzed != null && Number.isFinite(Number(d.resumesAnalyzed))
+              ? Number(d.resumesAnalyzed)
+              : FALLBACK_PLATFORM_STATS.resumesAnalyzed,
+          accuracy:
+            d.accuracy != null && Number.isFinite(Number(d.accuracy))
+              ? Number(d.accuracy)
+              : FALLBACK_PLATFORM_STATS.accuracy,
+          rating:
+            d.rating != null && Number.isFinite(Number(d.rating))
+              ? Number(d.rating)
+              : FALLBACK_PLATFORM_STATS.rating,
+        });
       } catch (error) {
-        console.error("Failed to load dynamic stats:", error);
+        if (error instanceof Error && error.name === "AbortError") return;
+        console.error("Failed to load platform stats:", error);
+        setPlatformStats({ ...FALLBACK_PLATFORM_STATS });
       } finally {
         setIsLoadingStats(false);
       }
     };
 
-    fetchStats();
+    void fetchStats();
+    return () => controller.abort();
   }, []);
 
   const formatNumber = (num: number) => {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + "M";
+    if (num >= 1_000) return (num / 1_000).toFixed(1) + "K";
     return num.toString();
   };
 
-  // Generate the stats array dynamically — `users` is platformStats.users only (no offset)
-  const dynamicStats = [
-    { value: isLoadingStats ? "..." : `${formatNumber(platformStats.resumesAnalyzed)}+`, label: "Resumes Analyzed" },
-    { value: `${platformStats.accuracy}%`, label: "ATS Accuracy" },
-    { value: isLoadingStats ? "..." : `${formatNumber(platformStats.users)}+`, label: "Users" },
-    { value: `${platformStats.rating}★`, label: "User Rating" },
+  const dynamicStats: { value: string; label: string; loading?: boolean }[] = [
+    {
+      value: isLoadingStats ? "" : `${formatNumber(platformStats.resumesAnalyzed)}+`,
+      label: "Resumes Analyzed",
+      loading: isLoadingStats,
+    },
+    {
+      value: isLoadingStats ? "" : `${platformStats.accuracy}%`,
+      label: "ATS Accuracy",
+      loading: isLoadingStats,
+    },
+    {
+      value: isLoadingStats ? "" : `${formatNumber(platformStats.users)}+`,
+      label: "Users",
+      loading: isLoadingStats,
+    },
+    {
+      value: isLoadingStats ? "" : `${platformStats.rating}★`,
+      label: "User Rating",
+      loading: isLoadingStats,
+    },
   ];
-  // --- Dynamic Stats Logic Ends Here ---
+  // --- Dynamic Stats End ---
 
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-slate-950 text-white selection:bg-indigo-500/30">
@@ -495,10 +538,14 @@ export function HomePage() {
           <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
             {dynamicStats.map((s, i) => (
               <motion.div key={s.label} variants={fadeUp} custom={i * 0.5} className="text-center">
-                <p className="text-3xl font-extrabold text-white">{s.value}</p>
+                {s.loading ? (
+                  <div className="mx-auto h-9 max-w-[5.5rem] rounded-md bg-white/10 motion-safe:animate-pulse" aria-hidden />
+                ) : (
+                  <p className="text-3xl font-extrabold text-white tabular-nums">{s.value}</p>
+                )}
                 <p className="mt-1 text-sm text-gray-500">{s.label}</p>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
           </div>
         </div>
       </Section>
