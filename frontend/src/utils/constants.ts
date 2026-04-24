@@ -1,5 +1,15 @@
 export const APP_NAME = import.meta.env.VITE_APP_NAME || "AI Resume Analyzer";
-export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+/** Base URL for `/api/...` routes. Accepts `https://host` or `https://host/api` from env. */
+function normalizeApiBaseUrl(raw: string | undefined): string {
+  const fallback = "http://localhost:5000/api";
+  if (raw == null || String(raw).trim() === "") return fallback;
+  let u = String(raw).trim().replace(/\/+$/, "");
+  if (!u.endsWith("/api")) u = `${u}/api`;
+  return u;
+}
+
+export const API_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
 
 /** Web client ID (Google Cloud OAuth). Env VITE_GOOGLE_CLIENT_ID overrides when set. */
 export const GOOGLE_CLIENT_ID =

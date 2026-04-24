@@ -1,5 +1,5 @@
 import express, { Router } from "express";
-import cors from "cors";
+import cors, { type CorsOptions } from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
@@ -12,27 +12,44 @@ import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
 
-// Security middleware (allow cross-origin browser fetches + CORS headers to apply together)
+// CORS first (before helmet). Array-only `origin` in `cors` omits headers when `Origin` is missing — use a callback.
+// Allow main Vercel host + any git-preview URL for this project: *-aliza-resume-analyzer.vercel.app
+const alizaOrPreviewVercel = /^https:\/\/([a-z0-9-]+-)?aliza-resume-analyzer\.vercel\.app$/i;
+
+const corsOptions: CorsOptions = {
+  origin(origin, callback) {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    if (allowedCorsOrigins.includes(origin) || alizaOrPreviewVercel.test(origin)) {
+      callback(null, true);
+      return;
+    }
+    console.warn(`[CORS] Blocked: ${origin}`);
+    callback(null, false);
+  },
+  credentials: true,
+  optionsSuccessStatus: 204,
+  maxAge: 86_400,
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+    "Cookie",
+  ],
+  exposedHeaders: ["Set-Cookie"],
+};
+
+app.use(cors(corsOptions));
+
+// Security middleware (coexists with CORS: CORP allows cross-site resource use)
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
-  })
-);
-
-// CORS: `allowedCorsOrigins` merges CORS_ORIGIN + FRONTEND_URL + local dev (see config/env.ts)
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedCorsOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-      console.warn(`[CORS] Blocked origin: ${origin}. Allowed: ${allowedCorsOrigins.join(", ") || "(none)"}`);
-      // Use `false`, not `Error`, or preflight can fail without Access-Control-Allow-Origin
-      callback(null, false);
-    },
-    credentials: true,
-    optionsSuccessStatus: 204,
   })
 );
 

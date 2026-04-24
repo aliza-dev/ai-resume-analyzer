@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { API_URL } from "@/utils/constants";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -353,13 +354,7 @@ export function HomePage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // API_BASE_URL always ends with exactly .../api (no trailing slash) — no /api//platform-stats
-        const raw = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(
-          /\/+$/,
-          ""
-        );
-        const API_BASE_URL = raw.endsWith("/api") ? raw : `${raw}/api`;
-        const response = await fetch(`${API_BASE_URL}/platform-stats`);
+        const response = await fetch(`${API_URL}/platform-stats`);
         const result = await response.json();
         
         if (result.success && result.data && typeof result.data === "object") {
