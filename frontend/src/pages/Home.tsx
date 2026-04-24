@@ -337,17 +337,57 @@ const steps = [
   { num: "03", icon: Target, title: "Get Hired", desc: "Match with jobs, prep for interviews, and land offers faster." },
 ];
 
-const stats = [
-  { value: "50K+", label: "Resumes Analyzed" },
-  { value: "98%", label: "ATS Accuracy" },
-  { value: "10K+", label: "Users" },
-  { value: "4.9★", label: "User Rating" },
-];
-
 /* ═══════════════════════════════════════════════════════════════════
  * Page
  * ═══════════════════════════════════════════════════════════════════ */
 export function HomePage() {
+  // --- Dynamic Stats Logic Starts Here ---
+  const [platformStats, setPlatformStats] = useState({
+    resumesAnalyzed: 0,
+    accuracy: 98, // Algorithm accuracy is fixed
+    users: 0,
+    rating: 4.9 // Manual rating for now
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        // Vite mein .env variables access karne ka tareeqa:
+        const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+        
+        // Kyunke VITE_API_URL ke aakhir mein pehle se '/api' hai, hum sirf '/platform-stats' lagayenge
+        const response = await fetch(`${API_BASE_URL}/platform-stats`);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          setPlatformStats(result.data);
+        }
+      } catch (error) {
+        console.error("Failed to load dynamic stats:", error);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+  };
+
+  // Generate the stats array dynamically for the render
+  const dynamicStats = [
+    { value: isLoadingStats ? "..." : `${formatNumber(platformStats.resumesAnalyzed)}+`, label: "Resumes Analyzed" },
+    { value: `${platformStats.accuracy}%`, label: "ATS Accuracy" },
+    { value: isLoadingStats ? "..." : `${formatNumber(platformStats.users)}+`, label: "Users" },
+    { value: `${platformStats.rating}★`, label: "User Rating" },
+  ];
+  // --- Dynamic Stats Logic Ends Here ---
+
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-slate-950 text-white selection:bg-indigo-500/30">
       {/* ── FLOATING NAVBAR ─────────────────────────────────────── */}
@@ -442,7 +482,7 @@ export function HomePage() {
             TRUSTED BY PROFESSIONALS FROM TOP TECH COMPANIES
           </motion.p>
           <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
-            {stats.map((s, i) => (
+            {dynamicStats.map((s, i) => (
               <motion.div key={s.label} variants={fadeUp} custom={i * 0.5} className="text-center">
                 <p className="text-3xl font-extrabold text-white">{s.value}</p>
                 <p className="mt-1 text-sm text-gray-500">{s.label}</p>

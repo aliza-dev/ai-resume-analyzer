@@ -7,6 +7,7 @@ import path from "path";
 
 import { env } from "./config/env";
 import routes from "./routes";
+import statsRoutes from "./routes/stats.routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
@@ -63,6 +64,7 @@ app.get("/", (_req, res) => {
 
 // API Routes
 app.use("/api", routes);
+app.use("/api", statsRoutes);
 
 // Error handling
 app.use(errorHandler);
