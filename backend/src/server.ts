@@ -5,29 +5,34 @@ import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import path from "path";
 
-import { env } from "./config/env";
+import { allowedCorsOrigins, env } from "./config/env";
 import routes from "./routes";
 import statsRouter from "./routes/stats.routes";
 import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
+// Security middleware (allow cross-origin browser fetches + CORS headers to apply together)
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 
-// CORS: support comma-separated origins (e.g. "https://prod.vercel.app,http://localhost:3000")
-const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean);
+// CORS: `allowedCorsOrigins` merges CORS_ORIGIN + FRONTEND_URL + local dev (see config/env.ts)
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (server-to-server, curl, mobile apps)
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedCorsOrigins.includes(origin)) {
         callback(null, true);
-      } else {
-        callback(new Error(`CORS: origin ${origin} not allowed`));
+        return;
       }
+      console.warn(`[CORS] Blocked origin: ${origin}. Allowed: ${allowedCorsOrigins.join(", ") || "(none)"}`);
+      // Use `false`, not `Error`, or preflight can fail without Access-Control-Allow-Origin
+      callback(null, false);
     },
     credentials: true,
+    optionsSuccessStatus: 204,
   })
 );
 
