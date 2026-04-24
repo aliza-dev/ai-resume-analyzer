@@ -17,5 +17,8 @@ export const env = {
   STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID || "",
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3000",
   ADMIN_EMAIL: process.env.ADMIN_EMAIL || "alizait1192@gmail.com",
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+  /** Web client ID; must match frontend Google OAuth client. GOOGLE_CLIENT_ID in .env overrides. */
+  GOOGLE_CLIENT_ID:
+    process.env.GOOGLE_CLIENT_ID ||
+    "635746911291-7tqkp4v5vab4k0hf5es0agafn67ug7ep.apps.googleusercontent.com",
 } as const;

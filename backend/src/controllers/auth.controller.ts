@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { OAuth2Client } from "google-auth-library";
 import { authService } from "../services/auth.service";
-import { registerSchema, loginSchema } from "../validators/auth";
+import { registerSchema, loginSchema, googleAuthBodySchema } from "../validators/auth";
 import { sendSuccess, sendError } from "../helpers/response";
 import { env } from "../config/env";
 import type { AuthenticatedRequest } from "../types";
@@ -49,22 +49,26 @@ export class AuthController {
   }
   async googleAuth(req: Request, res: Response, next: NextFunction) {
     try {
-      const { credential, profile } = req.body;
-      if (!credential || typeof credential !== "string") {
-        sendError(res, "Google credential token is required", 400);
+      const parsed = googleAuthBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        const first = parsed.error.issues[0];
+        sendError(res, first?.message || "Invalid request body", 400);
         return;
       }
+
+      const token = parsed.data.credential.trim();
+      const isLikelyIdToken = token.split(".").length === 3;
 
       let email: string | undefined;
       let name: string | undefined;
       let picture: string | undefined;
 
-      // Try ID token verification first (One Tap flow)
-      if (env.GOOGLE_CLIENT_ID && !profile) {
+      // If JWT: verifyIdToken. Otherwise (or on failure): Bearer access token → server-side userinfo only (no client profile).
+      if (isLikelyIdToken && env.GOOGLE_CLIENT_ID) {
         try {
           const client = new OAuth2Client(env.GOOGLE_CLIENT_ID);
           const ticket = await client.verifyIdToken({
-            idToken: credential,
+            idToken: token,
             audience: env.GOOGLE_CLIENT_ID,
           });
           const payload = ticket.getPayload();
@@ -74,27 +78,31 @@ export class AuthController {
             picture = payload.picture;
           }
         } catch {
-          // ID token verification failed — fall through to profile-based flow
+          // Not a valid ID token for this client — may be a JWT-shaped access token; try userinfo below
         }
       }
 
-      // Fallback: use profile data from access token flow
-      if (!email && profile && typeof profile === "object") {
-        const p = profile as { email?: string; name?: string; picture?: string };
+      if (!email) {
+        const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!userInfoRes.ok) {
+          sendError(res, "Could not verify Google account. Please try again.", 401);
+          return;
+        }
+        const p = (await userInfoRes.json()) as { email?: string; name?: string; picture?: string };
+        if (!p?.email) {
+          sendError(res, "Could not verify Google account. Please try again.", 401);
+          return;
+        }
         email = p.email;
         name = p.name;
         picture = p.picture;
       }
 
-      if (!email) {
-        sendError(res, "Could not verify Google account. Please try again.", 401);
-        return;
-      }
-
-      // Login or register via the auth service
       const result = await authService.googleAuth({
-        email,
-        name: name || email.split("@")[0],
+        email: email!,
+        name: (name as string) || email!.split("@")[0],
         picture: picture || "",
       });
 

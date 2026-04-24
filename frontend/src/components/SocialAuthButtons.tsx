@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import type { User } from "@/types";
 import { API_URL, TOKEN_KEY } from "@/utils/constants";
 
 function GoogleIcon() {
@@ -23,24 +24,30 @@ export function SocialAuthButtons() {
   const googleLogin = useGoogleLogin({
     flow: "implicit",
     onSuccess: async (tokenResponse) => {
-      // Exchange access token for user info, then create our own credential flow
+      // Backend verifies this access token with Google (userinfo) — do not trust client-side profile
+      if (!tokenResponse?.access_token) {
+        toast.error("No access token from Google. Please try again.");
+        return;
+      }
+      setIsLoading(true);
       try {
-        const userInfo = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        const profile = await userInfo.json();
-        // Send profile directly to our backend (skip ID token verification, use access token flow)
-        setIsLoading(true);
         const res = await fetch(`${API_URL}/auth/google`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential: tokenResponse.access_token, profile }),
+          body: JSON.stringify({ credential: tokenResponse.access_token }),
         });
-        const data = await res.json();
-        if (!res.ok) { toast.error(data.message || "Google sign-in failed"); return; }
+        const data = (await res.json()) as { message?: string; token?: string; user?: { name?: string } };
+        if (!res.ok) {
+          toast.error(data.message || "Google sign-in failed");
+          return;
+        }
+        if (!data.token || !data.user) {
+          toast.error("Invalid response from server. Please try again.");
+          return;
+        }
 
         localStorage.setItem(TOKEN_KEY, data.token);
-        useAuth.setState({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
+        useAuth.setState({ user: data.user as User, token: data.token, isAuthenticated: true, isLoading: false });
         toast.success(`Welcome${data.user?.name ? `, ${data.user.name.split(" ")[0]}` : ""}! 🎉`);
         navigate("/dashboard");
       } catch {

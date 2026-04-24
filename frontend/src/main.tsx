@@ -2,12 +2,11 @@ import { createRoot } from "react-dom/client";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { Toaster } from "sonner";
 import App from "./App";
+import { GOOGLE_CLIENT_ID } from "./utils/constants";
 import "./index.css";
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-
 createRoot(document.getElementById("root")!).render(
-  <GoogleOAuthProvider clientId={googleClientId}>
+  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
     <App />
     <Toaster
       position="top-right"

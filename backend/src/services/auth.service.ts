@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import prisma from "../config/database";
 import { hashPassword, comparePassword } from "../helpers/password";
 import { generateToken } from "../helpers/jwt";
@@ -96,12 +97,14 @@ export class AuthService {
     });
 
     if (!user) {
-      // Create new user (no password — Google-only auth)
+      // Unusable random password (Google-only; bcrypt requires a valid hash, not an empty string)
+      const randomSecret = randomBytes(32).toString("hex");
+      const oauthOnlyPassword = await hashPassword(randomSecret);
       user = await prisma.user.create({
         data: {
           name: data.name,
           email: data.email,
-          password: "", // Google users don't have a password
+          password: oauthOnlyPassword,
           role: "fresher",
           isPro: false,
           aiCredits: 1,

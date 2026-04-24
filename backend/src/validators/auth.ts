@@ -19,3 +19,10 @@ export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
+
+/** Google sign-in: only a verified token; `.strict()` rejects any extra fields (e.g. client `profile`). */
+export const googleAuthBodySchema = z
+  .object({
+    credential: z.string().min(1, "Google credential is required"),
+  })
+  .strict();
