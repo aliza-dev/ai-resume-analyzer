@@ -4,6 +4,7 @@
   "description": "AI Resume Analyzer & Job Matcher - Backend API",
   "main": "dist/server.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc",
     "start": "node dist/server.js",

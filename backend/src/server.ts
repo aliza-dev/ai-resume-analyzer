@@ -13,8 +13,18 @@ import { errorHandler } from "./middlewares/errorHandler";
 const app = express();
 
 // CORS first (before helmet). Array-only `origin` in `cors` omits headers when `Origin` is missing — use a callback.
-// Allow main Vercel host + any git-preview URL for this project: *-aliza-resume-analyzer.vercel.app
+// Production + legacy preview shape (thing-aliza-resume-analyzer.vercel.app)
 const alizaOrPreviewVercel = /^https:\/\/([a-z0-9-]+-)?aliza-resume-analyzer\.vercel\.app$/i;
+/** e.g. aliza-resume-analyzer-git-main-user.vercel.app (Vercel branch deploys) */
+function isAlizaVercelHost(url: string): boolean {
+  try {
+    const { hostname, protocol } = new URL(url);
+    if (protocol !== "https:") return false;
+    return hostname.endsWith(".vercel.app") && hostname.includes("aliza-resume-analyzer");
+  } catch {
+    return false;
+  }
+}
 
 const corsOptions: CorsOptions = {
   origin(origin, callback) {
@@ -22,7 +32,11 @@ const corsOptions: CorsOptions = {
       callback(null, true);
       return;
     }
-    if (allowedCorsOrigins.includes(origin) || alizaOrPreviewVercel.test(origin)) {
+    if (
+      allowedCorsOrigins.includes(origin) ||
+      alizaOrPreviewVercel.test(origin) ||
+      isAlizaVercelHost(origin)
+    ) {
       callback(null, true);
       return;
     }
