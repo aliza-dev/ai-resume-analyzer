@@ -1,5 +1,8 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Vercel serverless runs on Linux; without this, the query engine for deployment can be missing at runtime.
+  // See https://www.prisma.io/docs/orm/prisma-client/deployment/serverless/deploy-to-vercel
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
