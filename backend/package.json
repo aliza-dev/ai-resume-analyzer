@@ -2,7 +2,7 @@
   "name": "ai-resume-analyzer-backend",
   "version": "1.0.0",
   "description": "AI Resume Analyzer & Job Matcher - Backend API",
-  "main": "dist/server.js",
+  "main": "index.js",
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "tsx watch src/server.ts",
