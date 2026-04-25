@@ -1,13 +1,26 @@
-import natural from "natural";
 import { removeStopwords } from "stopword";
 
 // ══════════════════════════════════════════════════════════════════
 // ── NLP Engine: TF-IDF, Dynamic Skill Extraction, Semantic Match
 // ══════════════════════════════════════════════════════════════════
 
-const tokenizer = new natural.WordTokenizer();
-const TfIdf = natural.TfIdf;
-const stemmer = natural.PorterStemmer;
+/**
+ * Eagerly importing `natural` breaks Vercel serverless cold starts (bundler/runtime);
+ * we load it only when NLP code runs (e.g. resume analysis), not for OPTIONS/health.
+ */
+function loadNatural(): typeof import("natural") {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require("natural");
+}
+
+let wordTokenizer: import("natural").WordTokenizer | null = null;
+function getTokenizer(): import("natural").WordTokenizer {
+  if (!wordTokenizer) {
+    const n = loadNatural();
+    wordTokenizer = new n.WordTokenizer();
+  }
+  return wordTokenizer;
+}
 
 // ─── Dynamic Skill Patterns ─────────────────────────────────────
 // Regex patterns to detect skills NOT in any fixed list
@@ -79,6 +92,7 @@ const VALID_ACRONYMS = new Set([
 // ══════════════════════════════════════════════════════════════════
 
 export function extractKeywordsTfIdf(text: string, topN = 30): string[] {
+  const TfIdf = loadNatural().TfIdf;
   const tfidf = new TfIdf();
 
   // Add the resume as a document
@@ -117,7 +131,7 @@ export function extractKeywordsTfIdf(text: string, topN = 30): string[] {
 // ══════════════════════════════════════════════════════════════════
 
 export function extractNgrams(text: string, n: 2 | 3 = 2): string[] {
-  const words = tokenizer.tokenize(text.toLowerCase()) || [];
+  const words = getTokenizer().tokenize(text.toLowerCase()) || [];
   const filtered = removeStopwords(words);
   const ngrams: string[] = [];
 

@@ -1,7 +1,6 @@
 import prisma from "../config/database";
 import fs from "fs";
 import path from "path";
-import natural from "natural";
 import { runNlpAnalysis, classifyIndustry, extractKeywordsTfIdf, detectDynamicSkills } from "./nlp.engine";
 import {
   isLlmAvailable,
@@ -338,8 +337,11 @@ class AnalysisEngine {
     contact:  /\b(email|phone|address|linkedin|github|portfolio|website|contact|mobile)\b/i,
   };
 
-  /** Porter Stemmer instance for semantic matching */
-  private static stemmer = natural.PorterStemmer;
+  /** Lazy Porter stemmer — `natural` is not loaded until keyword matching runs (Vercel cold start). */
+  private static get stemmer() {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return (require("natural") as typeof import("natural")).PorterStemmer;
+  }
 
   /** Safe keyword match using word boundaries + semantic stemming
    *  "Collaboration" will match "Collaborated", "Collaborating", etc.
