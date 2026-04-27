@@ -230,11 +230,11 @@ export function DashboardPage() {
 
       {/* Charts */}
       {latestResume?.atsScore ? (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <motion.div variants={itemVariants}>
+        <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+          <motion.div variants={itemVariants} className="min-w-0">
             <AtsScoreChart score={latestResume.atsScore} />
           </motion.div>
-          <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants} className="min-w-0">
             <SkillsRadarChart
               skills={analysis?.skillsScore || 0}
               experience={analysis?.experienceScore || 0}

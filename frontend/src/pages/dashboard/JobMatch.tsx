@@ -478,8 +478,9 @@ export function JobMatchPage() {
             </Card>
 
             {/* Score Breakdown Chart */}
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid min-w-0 gap-6 lg:grid-cols-2">
               <motion.div
+                className="min-w-0"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}

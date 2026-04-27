@@ -7,6 +7,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RechartsSafeContainer } from "@/components/charts/RechartsSafeContainer";
 
 interface SkillsRadarChartProps {
   skills: number;
@@ -28,13 +29,15 @@ export function SkillsRadarChart({
     { subject: "Projects", score: projects, fullMark: 100 },
   ];
 
+  const hasData = data.some((d) => d.score > 0);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Resume Section Analysis</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] min-h-[300px] w-full min-w-0">
+        <RechartsSafeContainer empty={!hasData} emptyMessage="No section scores yet — run analysis to see this chart.">
           <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
             <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
               <PolarGrid stroke="#e5e7eb" />
@@ -57,7 +60,7 @@ export function SkillsRadarChart({
               />
             </RadarChart>
           </ResponsiveContainer>
-        </div>
+        </RechartsSafeContainer>
       </CardContent>
     </Card>
   );

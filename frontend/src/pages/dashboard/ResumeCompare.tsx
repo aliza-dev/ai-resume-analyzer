@@ -154,8 +154,31 @@ export function ResumeComparePage() {
       </motion.div>
 
       {/* Results */}
-      {result && (
+      {result && (() => {
+        const reliable = result.comparisonReliable !== false;
+        const rawDelta = result.rawAtsDelta ?? result.newScore - result.oldScore;
+        return (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          {!reliable && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/40 dark:bg-amber-900/10"
+            >
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="min-w-0 space-y-1">
+                <p className="font-medium text-amber-900 dark:text-amber-100">Comparison may be misleading</p>
+                <p className="text-xs text-amber-800/90 dark:text-amber-200/90">
+                  {result.verdict}
+                  {!reliable && (
+                    <span className="mt-2 block text-amber-700/80 dark:text-amber-300/80">
+                      Raw ATS difference (informational only): {rawDelta > 0 ? "+" : ""}{rawDelta} percentage points.
+                    </span>
+                  )}
+                </p>
+              </div>
+            </motion.div>
+          )}
           {/* Score Summary */}
           <div className="grid gap-4 sm:grid-cols-3">
             <Card>
@@ -167,9 +190,15 @@ export function ResumeComparePage() {
             <Card className="border-brand-200 bg-gradient-to-br from-brand-50 to-purple-50 dark:border-brand-800 dark:from-brand-900/20 dark:to-purple-900/20">
               <CardContent className="flex flex-col items-center p-6 text-center">
                 <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Improvement</p>
-                <p className={`text-4xl font-bold ${result.improvement > 0 ? "text-green-500" : result.improvement < 0 ? "text-red-500" : "text-gray-500"}`}>
-                  {result.improvement > 0 ? "+" : ""}{result.improvement}%
-                </p>
+                {reliable ? (
+                  <p className={`text-4xl font-bold ${result.improvement > 0 ? "text-green-500" : result.improvement < 0 ? "text-red-500" : "text-gray-500"}`}>
+                    {result.improvement > 0 ? "+" : ""}{result.improvement}%
+                  </p>
+                ) : (
+                  <p className="text-4xl font-bold text-gray-400 dark:text-gray-500" title="Headline improvement hidden when one side is unreliable">
+                    —
+                  </p>
+                )}
                 <p className="mt-1 text-sm font-medium text-brand-600 dark:text-brand-400">{result.verdict}</p>
               </CardContent>
             </Card>
@@ -206,7 +235,9 @@ export function ResumeComparePage() {
                       <span className="text-center text-sm text-gray-500">{c.old}{c.unit}</span>
                       <span className="text-center text-sm font-semibold text-gray-900 dark:text-white">{c.new}{c.unit}</span>
                       <div className="flex items-center justify-center">
-                        {diff > 0 ? (
+                        {!reliable ? (
+                          <Badge variant="secondary" className="gap-1">—</Badge>
+                        ) : diff > 0 ? (
                           <Badge variant="success" className="gap-1">
                             <TrendingUp className="h-3 w-3" /> +{diff}
                           </Badge>
@@ -228,7 +259,8 @@ export function ResumeComparePage() {
             </CardContent>
           </Card>
         </motion.div>
-      )}
+        );
+      })()}
     </div>
   );
 }

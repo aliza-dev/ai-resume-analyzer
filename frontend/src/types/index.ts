@@ -158,7 +158,13 @@ export interface GeneratedContent {
 export interface ResumeComparison {
   oldScore: number;
   newScore: number;
+  /** ATS delta when both sides are reliable; otherwise 0 (see `comparisonReliable`) */
   improvement: number;
+  /** Always `newScore - oldScore`, even when comparison is not reliable (for debugging / transparency) */
+  rawAtsDelta?: number;
+  /** False when one or both stored analyses are missing or look like failed/broken runs */
+  comparisonReliable?: boolean;
+  unreliableSide?: "old" | "new" | "both" | null;
   verdict: string;
   comparisons: { label: string; old: number; new: number; unit: string }[];
 }

@@ -33,8 +33,9 @@ function today() { return new Date().toLocaleDateString("en-US", { year: "numeri
 
 /**
  * Call Gemini with a prompt, parse JSON response, with retry on rate limit
+ * (free / low QPS tiers often return 429 — backoff gives the API time to recover).
  */
-async function callGemini<T>(prompt: string, maxRetries = 2): Promise<T | null> {
+async function callGemini<T>(prompt: string, maxRetries = 3): Promise<T | null> {
   const model = getModel();
   if (!model) return null;
 
@@ -54,12 +55,19 @@ async function callGemini<T>(prompt: string, maxRetries = 2): Promise<T | null> 
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
 
-      const is429 = errMsg.includes("429") || errMsg.toLowerCase().includes("resource exhausted") || errMsg.toLowerCase().includes("quota");
+      const is429 =
+        errMsg.includes("429") ||
+        errMsg.toLowerCase().includes("resource exhausted") ||
+        errMsg.toLowerCase().includes("quota") ||
+        errMsg.toLowerCase().includes("rate limit");
+      const isOverloaded = errMsg.includes("503") || errMsg.toLowerCase().includes("overloaded");
 
-      // Retry on rate limit (429)
-      if (is429 && attempt < maxRetries) {
-        const waitTime = (attempt + 1) * 15000; // 15s, 30s
-        console.log(`[LLM] Rate limited, retrying in ${waitTime / 1000}s... (attempt ${attempt + 1}/${maxRetries})`);
+      // Retry on rate limit (429) or temporary overload
+      if ((is429 || isOverloaded) && attempt < maxRetries) {
+        const waitTime = (attempt + 1) * 12000; // 12s, 24s, 36s…
+        console.log(
+          `[LLM] ${isOverloaded ? "Service busy" : "Rate limited"} — retry in ${waitTime / 1000}s (attempt ${attempt + 1}/${maxRetries})…`,
+        );
         await sleep(waitTime);
         continue;
       }
@@ -160,6 +168,17 @@ export interface LlmAnalysisResult {
   keyword_score?: number;
 }
 
+function isValidLlmScores(r: LlmAnalysisResult | null): r is LlmAnalysisResult {
+  if (!r) return false;
+  const nums = [
+    r.ats_score, r.skills_score, r.experience_score, r.education_score, r.projects_score,
+  ];
+  if (nums.some((n) => typeof n !== "number" || !Number.isFinite(n))) return false;
+  if (nums.some((n) => n < 0 || n > 100)) return false;
+  if (!Array.isArray(r.matched_keywords) || !Array.isArray(r.missing_keywords) || !Array.isArray(r.suggestions)) return false;
+  return true;
+}
+
 export async function llmAnalyzeResume(resumeText: string): Promise<LlmAnalysisResult | null> {
   const wordCount = resumeText.split(/\s+/).filter(Boolean).length;
   const prompt = `You are a strict, realistic ATS resume analyzer. Date: ${today()}. Return ONLY valid JSON, no other text.
@@ -237,7 +256,16 @@ SUGGESTION ACCURACY RULES (CRITICAL — avoid false positives):
 - If you detect the section exists but could be improved, say "Enhance your Education section with..." instead of "Add an Education section".
 - The "suggestions" array must contain ONLY actionable improvements that are genuinely missing. Double-check each suggestion against the full resume text.`;
 
-  const result = await callGemini<LlmAnalysisResult>(prompt);
+  let result = await callGemini<LlmAnalysisResult>(prompt);
+  if (!isValidLlmScores(result)) {
+    console.warn("[LLM] First analyze response missing or invalid scores — retrying once...");
+    await sleep(800);
+    result = await callGemini<LlmAnalysisResult>(prompt);
+  }
+  if (!isValidLlmScores(result)) {
+    console.error("[LLM] Resume analysis JSON invalid after retry — will use rule-based fallback in caller");
+    return null;
+  }
 
   // ── Post-processing: enforce education score if keywords found ──
   if (result && result.education_score === 0) {
@@ -590,7 +618,12 @@ PLAIN TEXT FORMATTING (CRITICAL):
 ${coverLetterRules}
 Make it professional, personalized, and compelling. Reference ONLY specific skills that are explicitly listed in the RESUME — never from the JD alone.`;
 
-  const result = await callGemini<{ type: string; content: string }>(prompt);
+  let result = await callGemini<{ type: string; content: string }>(prompt);
+  if (!result?.content) {
+    console.warn("[LLM] generate-content empty result — one retry after cooldown…");
+    await sleep(1500);
+    result = await callGemini<{ type: string; content: string }>(prompt);
+  }
 
   // Safety net: strip any markdown that slipped through
   if (result?.content) {

@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { getScoreColor } from "@/utils/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RechartsSafeContainer } from "@/components/charts/RechartsSafeContainer";
 
 interface JobMatchBarChartProps {
   skillMatch: number;
@@ -31,13 +32,15 @@ export function JobMatchBarChart({
     { name: "Overall", score: overallScore },
   ];
 
+  const hasData = data.some((d) => d.score > 0);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Job Match Breakdown</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] min-h-[300px] w-full min-w-0">
+        <RechartsSafeContainer empty={!hasData} emptyMessage="No match scores to chart — run a job match after analyzing your resume.">
           <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
             <BarChart data={data} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -66,7 +69,7 @@ export function JobMatchBarChart({
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </RechartsSafeContainer>
       </CardContent>
     </Card>
   );

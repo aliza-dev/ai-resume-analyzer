@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { resumeApi } from "@/api/resume";
 import type { Resume, ResumePreview } from "@/types";
+import { RechartsSafeContainer } from "@/components/charts/RechartsSafeContainer";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Demo data — used by the "Try demo data" button so users can verify the
@@ -439,14 +440,14 @@ export function VisualizationsPage() {
           </Card>
 
           {/* ═══ TOP TECHNOLOGIES BAR CHART ═══ */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
+          <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+            <Card className="min-w-0">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Code2 className="h-5 w-5 text-purple-500" /> Top Technologies</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="min-w-0">
                 {(preview.topSkills?.length ?? 0) > 0 ? (
-                  <div className="h-[300px] min-h-[300px] w-full min-w-0">
+                  <RechartsSafeContainer>
                     <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
                       <BarChart data={preview.topSkills.slice(0, 10)} layout="vertical" barCategoryGap="15%">
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -460,7 +461,7 @@ export function VisualizationsPage() {
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
+                  </RechartsSafeContainer>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Code2 className="mb-2 h-8 w-8 text-gray-300 dark:text-gray-600" />

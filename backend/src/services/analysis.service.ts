@@ -16,6 +16,24 @@ import {
   extractTextWithGeminiVision,
 } from "./llm.service";
 
+/**
+ * Detect failed / glitched analysis suitable for discarding in favor of
+ * fallbacks, or for suppressing misleading compare deltas. Kept in sync with
+ * analyzeResume() safety-net logic.
+ */
+function isDegenerateAnalysis(
+  ats: number,
+  skills: number,
+  exp: number,
+  edu: number,
+  proj: number,
+): boolean {
+  const sectionSum = skills + exp + edu + proj;
+  if (sectionSum <= 5) return true;
+  if (ats < 5 && sectionSum < 30) return true;
+  return false;
+}
+
 // ══════════════════════════════════════════════════════════════════
 // ── Robust Text Extraction & Normalization ───────────────────────
 // ══════════════════════════════════════════════════════════════════
@@ -157,6 +175,11 @@ async function extractTextFromFile(filePath: string): Promise<string> {
       const buffer = fs.readFileSync(resolvedPath);
       const data = await pdfParse(buffer);
       rawText = data.text || "";
+      const w = (rawText || "").split(/\s+/).filter(Boolean).length;
+      console.log(
+        `[Parser] PDF ${path.basename(resolvedPath)}: ${buffer.length} bytes → pdf-parse word count: ${w}` +
+        (w === 0 ? " (empty — may be image-only or protected)" : ` — preview: ${(rawText || "").slice(0, 120).replace(/\s+/g, " ")}…`),
+      );
     } else if (ext === ".docx") {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const mammoth = require("mammoth");
@@ -178,7 +201,9 @@ async function extractTextFromFile(filePath: string): Promise<string> {
   }
 
   if (!rawText.trim()) {
-    console.warn("No text extracted from file:", resolvedPath);
+    console.warn(
+      `[Parser] No extractable text after pdf-parse + optional Gemini Vision: ${path.basename(resolvedPath)} (path exists: true)`,
+    );
     return "";
   }
 
@@ -1935,25 +1960,6 @@ export class AnalysisService {
     let missingKeywords: string[];
     let suggestions: string[];
 
-    // Helper: detect "degenerate" analysis output where the LLM gave up.
-    // Real resumes always score >0 on at least one dimension. If everything is
-    // 0 (or near-0 like ats=1), it's almost certainly a failed extraction or
-    // an LLM hallucination, not a genuinely terrible resume.
-    const isDegenerate = (
-      ats: number,
-      skills: number,
-      exp: number,
-      edu: number,
-      proj: number,
-    ): boolean => {
-      const sectionSum = skills + exp + edu + proj;
-      // All sections produced ~nothing → the analyzer couldn't read the resume
-      if (sectionSum <= 5) return true;
-      // ATS is suspiciously low AND most sections empty → LLM gave up
-      if (ats < 5 && sectionSum < 30) return true;
-      return false;
-    };
-
     // ── Try LLM first ──
     if (isLlmAvailable()) {
       console.log("[Analysis] Using Gemini AI...");
@@ -1980,7 +1986,7 @@ export class AnalysisService {
 
         // ── Sanity check: catch degenerate LLM output (e.g., ats=1, all sections=0)
         // and fall through to rule-based engine, which uses real text patterns.
-        if (isDegenerate(atsScore, skillsScore, experienceScore, educationScore, projectsScore)) {
+        if (isDegenerateAnalysis(atsScore, skillsScore, experienceScore, educationScore, projectsScore)) {
           console.warn(
             `[Analysis] ⚠️ LLM returned degenerate scores (ats=${atsScore}, ` +
             `skills=${skillsScore}, exp=${experienceScore}, edu=${educationScore}, ` +
@@ -2004,7 +2010,7 @@ export class AnalysisService {
     // If even the rule-based engine produced nothing useful (e.g., text extraction
     // gave us a stub like "could not be parsed"), preserve previous good data if
     // any, otherwise apply the minimum-score fallback with a guidance message.
-    if (isDegenerate(atsScore, skillsScore, experienceScore, educationScore, projectsScore)) {
+    if (isDegenerateAnalysis(atsScore, skillsScore, experienceScore, educationScore, projectsScore)) {
       const prev = resume.analysis;
       if (prev && prev.skillsScore > 0) {
         console.log("[Analysis] Preserving previous analysis data (current extraction failed)");
@@ -2647,13 +2653,46 @@ export class AnalysisService {
     ]);
     if (!oldResume || !newResume) throw new Error("Resume not found");
 
-    // Use stored ATS scores as SSOT (not re-computed rule-based scores)
+    // Use stored ATS + section scores as SSOT
     const oldScore = oldResume.atsScore ?? 0;
     const newScore = newResume.atsScore ?? 0;
-    const improvement = newScore - oldScore;
+    const rawAtsDelta = newScore - oldScore;
 
     const oldA = oldResume.analysis;
     const newA = newResume.analysis;
+
+    const oldReliable =
+      !!oldA && !isDegenerateAnalysis(
+        oldScore, oldA.skillsScore, oldA.experienceScore, oldA.educationScore, oldA.projectsScore,
+      );
+    const newReliable =
+      !!newA && !isDegenerateAnalysis(
+        newScore, newA.skillsScore, newA.experienceScore, newA.educationScore, newA.projectsScore,
+      );
+    const comparisonReliable = oldReliable && newReliable;
+
+    type Side = "old" | "new" | "both" | null;
+    let unreliableSide: Side = null;
+    if (!oldReliable && !newReliable) unreliableSide = "both";
+    else if (!oldReliable) unreliableSide = "old";
+    else if (!newReliable) unreliableSide = "new";
+
+    let improvement: number;
+    let verdict: string;
+
+    if (!comparisonReliable) {
+      improvement = 0;
+      if (unreliableSide === "both") {
+        verdict = "Cannot compare — run analysis on both resumes (stored scores look incomplete or missing).";
+      } else if (unreliableSide === "new") {
+        verdict = "Not a fair comparison — the new resume's analysis looks broken or never completed. Re-run analysis, then compare again.";
+      } else {
+        verdict = "Not a fair comparison — the old resume's analysis looks broken or never completed. Re-run analysis, then compare again.";
+      }
+    } else {
+      improvement = rawAtsDelta;
+      verdict = improvement > 15 ? "Major Improvement! 🎉" : improvement > 5 ? "Good Progress! 👍" : improvement > 0 ? "Slight Improvement" : improvement === 0 ? "No Change" : "Score Decreased ⚠️";
+    }
 
     const comparisons = [
       { label: "ATS Score", old: oldScore, new: newScore, unit: "%" },
@@ -2669,7 +2708,10 @@ export class AnalysisService {
       oldScore,
       newScore,
       improvement,
-      verdict: improvement > 15 ? "Major Improvement! 🎉" : improvement > 5 ? "Good Progress! 👍" : improvement > 0 ? "Slight Improvement" : improvement === 0 ? "No Change" : "Score Decreased ⚠️",
+      rawAtsDelta,
+      comparisonReliable,
+      unreliableSide,
+      verdict,
       comparisons,
     };
   }

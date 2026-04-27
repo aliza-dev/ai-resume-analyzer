@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -290,14 +290,21 @@ export function ResumeAnalysisPage() {
   const [badgesData, setBadgesData] = useState<BadgesResponse | null>(null);
   const [loadingStage, setLoadingStage] = useState("");
   const [isPdfGenerating, setIsPdfGenerating] = useState(false);
+  /** Avoid re-fetching hiring/benchmark/badges when analysis object reference changes without real data change */
+  const extrasFetchKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    extrasFetchKeyRef.current = null;
+  }, [resumeId]);
 
   useEffect(() => {
     // ── Sample resume: load mock data directly (no API call, no credits) ──
-    if (isSample && (location.state as { sampleData?: { atsScore: number; fileName: string; analysis: Analysis } })?.sampleData) {
-      const sample = (location.state as { sampleData: { id: string; atsScore: number; fileName: string; analysis: Analysis } }).sampleData;
-      setResume({ id: sample.id, userId: "", fileUrl: "", fileName: sample.fileName, atsScore: sample.atsScore, createdAt: new Date().toISOString(), analysis: sample.analysis });
-      setAnalysis(sample.analysis);
-      return;
+    if (isSample) {
+      const st = (location.state as { sampleData?: { id: string; atsScore: number; fileName: string; analysis: Analysis } } | null)?.sampleData;
+      if (st) {
+        setResume({ id: st.id, userId: "", fileUrl: "", fileName: st.fileName, atsScore: st.atsScore, createdAt: new Date().toISOString(), analysis: st.analysis });
+        setAnalysis(st.analysis);
+        return;
+      }
     }
 
     if (resumeId) {
@@ -315,7 +322,9 @@ export function ResumeAnalysisPage() {
         })
         .finally(() => setIsLoading(false));
     }
-  }, [resumeId, isSample, location.state]);
+    // `location.state` is unstable (new object per render) — use `location.key` so we only
+    // re-run on real navigations, not on arbitrary parent re-renders.
+  }, [resumeId, isSample, location.key]);
 
   const LOADING_STAGES = [
     "Extracting text from resume...",
@@ -360,14 +369,48 @@ export function ResumeAnalysisPage() {
     }
   };
 
-  // Auto-load hiring probability, benchmark, badges when analysis is ready
+  // Auto-load hiring probability, benchmark, badges when analysis is ready (once per score snapshot)
   useEffect(() => {
-    if (analysis && resumeId) {
-      resumeApi.getHiringProbability(resumeId).then(setHiringData).catch(() => {});
-      resumeApi.getGlobalBenchmark(resumeId).then(setBenchmarkData).catch(() => {});
-      resumeApi.getBadges(resumeId).then(setBadgesData).catch(() => {});
-    }
-  }, [analysis, resumeId]);
+    if (!analysis || !resumeId || !resume) return;
+
+    const key = [
+      resumeId,
+      resume.atsScore ?? "null",
+      analysis.skillsScore,
+      analysis.experienceScore,
+      analysis.educationScore,
+      analysis.projectsScore,
+    ].join("|");
+
+    if (extrasFetchKeyRef.current === key) return;
+    extrasFetchKeyRef.current = key;
+
+    let cancelled = false;
+    const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    const run = async () => {
+      try {
+        const h = await resumeApi.getHiringProbability(resumeId);
+        if (cancelled) return;
+        setHiringData(h);
+        await delay(400);
+        const b = await resumeApi.getGlobalBenchmark(resumeId);
+        if (cancelled) return;
+        setBenchmarkData(b);
+        await delay(400);
+        const bad = await resumeApi.getBadges(resumeId);
+        if (cancelled) return;
+        setBadgesData(bad);
+      } catch {
+        /* keep prior state */
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [analysis, resumeId, resume]);
 
   if (!resumeId) {
     return (
@@ -496,12 +539,12 @@ export function ResumeAnalysisPage() {
             animate="show"
             className="space-y-6"
           >
-            {/* Charts Row */}
-            <div className="grid gap-6 lg:grid-cols-3">
-              <motion.div variants={itemVariants}>
+            {/* Charts Row — min-w-0 prevents grid/flex from collapsing chart width to 0 */}
+            <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+              <motion.div variants={itemVariants} className="min-w-0">
                 <AtsScoreChart score={resume?.atsScore || 0} />
               </motion.div>
-              <motion.div variants={itemVariants}>
+              <motion.div variants={itemVariants} className="min-w-0">
                 <StrengthMeter
                   score={resume?.atsScore || 0}
                   skillsScore={analysis.skillsScore}
@@ -510,7 +553,7 @@ export function ResumeAnalysisPage() {
                   projectsScore={analysis.projectsScore}
                 />
               </motion.div>
-              <motion.div variants={itemVariants}>
+              <motion.div variants={itemVariants} className="min-w-0">
                 <SkillsRadarChart
                   skills={analysis.skillsScore}
                   experience={analysis.experienceScore}
