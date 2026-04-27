@@ -158,12 +158,19 @@ export interface GeneratedContent {
 export interface ResumeComparison {
   oldScore: number;
   newScore: number;
-  /** ATS delta when both sides are reliable; otherwise 0 (see `comparisonReliable`) */
+  /** ATS change (new − old) when the new resume’s analysis is trustworthy */
   improvement: number;
   /** Always `newScore - oldScore`, even when comparison is not reliable (for debugging / transparency) */
   rawAtsDelta?: number;
-  /** False when one or both stored analyses are missing or look like failed/broken runs */
+  /**
+   * Legacy: true when *both* sides look trustworthy (use `fullComparisonReliable` if present).
+   * Kept for older deployed backends.
+   */
   comparisonReliable?: boolean;
+  /** True when both old and new section scores are safe to use for per-row “Change” badges */
+  fullComparisonReliable?: boolean;
+  /** True when the new resume’s analysis is solid enough to show headline ATS improvement */
+  atsHeadlineValid?: boolean;
   unreliableSide?: "old" | "new" | "both" | null;
   verdict: string;
   comparisons: { label: string; old: number; new: number; unit: string }[];

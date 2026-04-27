@@ -2013,6 +2013,13 @@ export class AnalysisService {
     if (isDegenerateAnalysis(atsScore, skillsScore, experienceScore, educationScore, projectsScore)) {
       const prev = resume.analysis;
       if (prev && prev.skillsScore > 0) {
+        const wordCount = resumeText.split(/\s+/).filter(Boolean).length;
+        if (wordCount >= 20) {
+          await prisma.resume.update({
+            where: { id: resumeId },
+            data: { storedResumeText: resumeText.slice(0, 500_000) },
+          });
+        }
         console.log("[Analysis] Preserving previous analysis data (current extraction failed)");
         return prev;
       }
@@ -2034,8 +2041,11 @@ export class AnalysisService {
       ];
     }
 
-    // Update ATS score on resume
-    await prisma.resume.update({ where: { id: resumeId }, data: { atsScore } });
+    // Persist extracted/normalized text for preview & visualizations when the file
+    // is no longer on disk (Vercel /tmp). Capped to stay within Mongo document limits.
+    const MAX_STORED_TEXT = 500_000;
+    const textToStore = resumeText.slice(0, MAX_STORED_TEXT);
+    await prisma.resume.update({ where: { id: resumeId }, data: { atsScore, storedResumeText: textToStore } });
 
     // Upsert analysis
     const analysis = await prisma.analysis.upsert({
@@ -2269,7 +2279,12 @@ export class AnalysisService {
   async getResumeText(resumeId: string, userId: string): Promise<string> {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId } });
     if (!resume) throw new Error("Resume not found");
-    return extractTextFromFile(resume.fileUrl);
+    let t = await extractTextFromFile(resume.fileUrl);
+    const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
+    if (wordCount(t) < 20 && resume.storedResumeText && wordCount(resume.storedResumeText) >= 20) {
+      t = resume.storedResumeText;
+    }
+    return t;
   }
 
   async getResumePreview(resumeId: string, userId: string) {
@@ -2285,7 +2300,17 @@ export class AnalysisService {
       console.warn("[Preview] File extraction failed:", err);
     }
 
-    const fileTextOk = text.trim().length > 0 && text.split(/\s+/).length >= 20;
+    const wordCountOf = (s: string) => s.split(/\s+/).filter(Boolean).length;
+    // Fall back to text stored at last analysis (same content we scored) for preview/Quick Stats
+    if (wordCountOf(text) < 20 && resume.storedResumeText) {
+      const st = resume.storedResumeText.trim();
+      if (st.length > 0 && wordCountOf(st) >= 20) {
+        text = st;
+        console.log(`[Preview] Using stored resume text from DB for ${resume.fileName} (${wordCountOf(text)} words)`);
+      }
+    }
+
+    const fileTextOk = text.trim().length > 0 && wordCountOf(text) >= 20;
 
     // ── If the file is gone but we have stored Analysis, build the preview from
     //    stored keywords directly (no synthetic-text reconstruction). ──
@@ -2425,11 +2450,22 @@ export class AnalysisService {
     // Run industry classification on a comma-joined keyword string
     const keywordBlob = storedKeywords.join(", ");
     const industryClassification = classifyIndustry(keywordBlob);
+    // Rough counts so Quick Stats aren’t all zeros when file + DB text are missing (legacy data)
+    const estWords = Math.min(
+      5000,
+      Math.max(80, Math.round(keywordBlob.split(/\s+/).filter(Boolean).length * 1.4 + 180)),
+    );
+    const sectionSummary = {
+      name: "Recovered from last analysis",
+      content:
+        "The original file is not on the server, and no stored resume text is saved yet. Re-run “Analyze” on a text-based PDF to store full text for previews. Below are skills recovered from your stored keyword analysis.",
+      color: "#6366f1",
+    } as { name: string; content: string; color: string };
 
     return {
       fullText: "",
-      wordCount: 0,
-      sections: [] as { name: string; content: string; color: string }[],
+      wordCount: estWords,
+      sections: [sectionSummary],
       highlights: {
         techKeywords: techFound,
         softSkills: softFound,
@@ -2669,7 +2705,13 @@ export class AnalysisService {
       !!newA && !isDegenerateAnalysis(
         newScore, newA.skillsScore, newA.experienceScore, newA.educationScore, newA.projectsScore,
       );
-    const comparisonReliable = oldReliable && newReliable;
+    /** Both sides have trustworthy section rows for the “Change” column */
+    const fullComparisonReliable = oldReliable && newReliable;
+    /**
+     * ATS headline improvement: trust **new** resume analysis. A low or broken
+     * *old* snapshot (e.g. 1% from a failed run) should not hide a real gain (e.g. 68% new).
+     */
+    const atsHeadlineValid = newReliable;
 
     type Side = "old" | "new" | "both" | null;
     let unreliableSide: Side = null;
@@ -2680,18 +2722,25 @@ export class AnalysisService {
     let improvement: number;
     let verdict: string;
 
-    if (!comparisonReliable) {
+    if (!atsHeadlineValid) {
       improvement = 0;
       if (unreliableSide === "both") {
         verdict = "Cannot compare — run analysis on both resumes (stored scores look incomplete or missing).";
-      } else if (unreliableSide === "new") {
-        verdict = "Not a fair comparison — the new resume's analysis looks broken or never completed. Re-run analysis, then compare again.";
       } else {
-        verdict = "Not a fair comparison — the old resume's analysis looks broken or never completed. Re-run analysis, then compare again.";
+        verdict = "Cannot compare — the new resume's analysis looks broken or never completed. Re-run analysis, then compare again.";
       }
     } else {
       improvement = rawAtsDelta;
-      verdict = improvement > 15 ? "Major Improvement! 🎉" : improvement > 5 ? "Good Progress! 👍" : improvement > 0 ? "Slight Improvement" : improvement === 0 ? "No Change" : "Score Decreased ⚠️";
+      const tier =
+        improvement > 15 ? "Major Improvement! 🎉" :
+          improvement > 5 ? "Good Progress! 👍" :
+            improvement > 0 ? "Slight Improvement" :
+              improvement === 0 ? "No Change" : "Score Decreased ⚠️";
+      if (!oldReliable) {
+        verdict = `${tier} (Earlier resume had very low or incomplete section scores; ATS change is still shown.)`;
+      } else {
+        verdict = tier;
+      }
     }
 
     const comparisons = [
@@ -2709,7 +2758,10 @@ export class AnalysisService {
       newScore,
       improvement,
       rawAtsDelta,
-      comparisonReliable,
+      /** @deprecated use fullComparisonReliable; kept for older clients */
+      comparisonReliable: fullComparisonReliable,
+      fullComparisonReliable,
+      atsHeadlineValid,
       unreliableSide,
       verdict,
       comparisons,

@@ -335,10 +335,10 @@ export function VisualizationsPage() {
           <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/40 dark:bg-amber-900/10">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-amber-800 dark:text-amber-200">Showing visualization from stored analysis</p>
+              <p className="font-medium text-amber-800 dark:text-amber-200">Limited preview (file not on server)</p>
               <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
-                The original resume file is no longer accessible on the server, so the resume text preview is unavailable.
-                Re-upload the file to see section-level highlights.
+                The PDF isn’t on the server anymore (common on serverless hosting). Charts use your stored analysis.
+                Run <strong>Analyze</strong> on a text-based PDF so we can save full text to your profile for highlights and accurate word counts next time.
               </p>
             </div>
           </div>
@@ -406,9 +406,9 @@ export function VisualizationsPage() {
               <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-brand-500" /> Detected Skills Cloud</CardTitle>
               <CardDescription>{preview.topSkills.length} skills detected — size = frequency in resume</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="min-h-[300px]">
               {preview.topSkills.length > 0 ? (
-                <div className="flex flex-wrap items-center justify-center gap-2 py-4">
+                <div className="flex min-h-[260px] flex-wrap items-center justify-center gap-2 py-4">
                   {preview.topSkills.map((s, i) => {
                     const maxCount = preview.topSkills[0]?.count || 1;
                     const size = 0.75 + (s.count / maxCount) * 1.2; // 0.75rem to 1.95rem
@@ -440,12 +440,12 @@ export function VisualizationsPage() {
           </Card>
 
           {/* ═══ TOP TECHNOLOGIES BAR CHART ═══ */}
-          <div className="grid min-w-0 gap-6 lg:grid-cols-2">
-            <Card className="min-w-0">
+          <div className="grid min-w-0 grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
+            <Card className="min-h-[380px] min-w-0">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Code2 className="h-5 w-5 text-purple-500" /> Top Technologies</CardTitle>
               </CardHeader>
-              <CardContent className="min-w-0">
+              <CardContent className="min-h-[300px] min-w-0">
                 {(preview.topSkills?.length ?? 0) > 0 ? (
                   <RechartsSafeContainer>
                     <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
@@ -473,11 +473,11 @@ export function VisualizationsPage() {
             </Card>
 
             {/* Industry + Stats */}
-            <Card>
+            <Card className="min-h-[380px] min-w-0">
               <CardHeader>
                 <CardTitle>Quick Stats</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="min-h-[300px] space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl bg-brand-50 p-3 text-center dark:bg-brand-900/20">
                     <FileText className="mx-auto mb-1 h-5 w-5 text-brand-500" />
