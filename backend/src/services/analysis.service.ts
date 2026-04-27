@@ -1935,6 +1935,25 @@ export class AnalysisService {
     let missingKeywords: string[];
     let suggestions: string[];
 
+    // Helper: detect "degenerate" analysis output where the LLM gave up.
+    // Real resumes always score >0 on at least one dimension. If everything is
+    // 0 (or near-0 like ats=1), it's almost certainly a failed extraction or
+    // an LLM hallucination, not a genuinely terrible resume.
+    const isDegenerate = (
+      ats: number,
+      skills: number,
+      exp: number,
+      edu: number,
+      proj: number,
+    ): boolean => {
+      const sectionSum = skills + exp + edu + proj;
+      // All sections produced ~nothing → the analyzer couldn't read the resume
+      if (sectionSum <= 5) return true;
+      // ATS is suspiciously low AND most sections empty → LLM gave up
+      if (ats < 5 && sectionSum < 30) return true;
+      return false;
+    };
+
     // ── Try LLM first ──
     if (isLlmAvailable()) {
       console.log("[Analysis] Using Gemini AI...");
@@ -1958,6 +1977,18 @@ export class AnalysisService {
           keywordScore: llmResult.keyword_score ?? 65,
         };
         console.log(`[Analysis] ✅ LLM analysis complete — ATS: ${atsScore}%`);
+
+        // ── Sanity check: catch degenerate LLM output (e.g., ats=1, all sections=0)
+        // and fall through to rule-based engine, which uses real text patterns.
+        if (isDegenerate(atsScore, skillsScore, experienceScore, educationScore, projectsScore)) {
+          console.warn(
+            `[Analysis] ⚠️ LLM returned degenerate scores (ats=${atsScore}, ` +
+            `skills=${skillsScore}, exp=${experienceScore}, edu=${educationScore}, ` +
+            `proj=${projectsScore}) — falling back to rule-based engine`,
+          );
+          const fb = this._ruleBasedAnalysis(resumeText, resume.fileName);
+          ({ atsScore, skillsScore, experienceScore, educationScore, projectsScore, keywords, missingKeywords, suggestions } = fb);
+        }
       } else {
         console.log("[Analysis] ⚠️ LLM failed, using rule-based engine");
         const fb = this._ruleBasedAnalysis(resumeText, resume.fileName);
@@ -1969,16 +2000,18 @@ export class AnalysisService {
       ({ atsScore, skillsScore, experienceScore, educationScore, projectsScore, keywords, missingKeywords, suggestions } = fb);
     }
 
-    // If analysis produced nothing useful, check if we have previous stored data to preserve
-    if (atsScore <= 0 && skillsScore <= 0) {
+    // ── Final safety net ──
+    // If even the rule-based engine produced nothing useful (e.g., text extraction
+    // gave us a stub like "could not be parsed"), preserve previous good data if
+    // any, otherwise apply the minimum-score fallback with a guidance message.
+    if (isDegenerate(atsScore, skillsScore, experienceScore, educationScore, projectsScore)) {
       const prev = resume.analysis;
       if (prev && prev.skillsScore > 0) {
-        // Preserve previous successful analysis
         console.log("[Analysis] Preserving previous analysis data (current extraction failed)");
         return prev;
       }
 
-      // No previous data either — set minimum scores with helpful message
+      console.warn("[Analysis] All analyzers returned degenerate output — applying guidance fallback");
       atsScore = 15;
       skillsScore = 10;
       experienceScore = 10;
@@ -2331,9 +2364,24 @@ export class AnalysisService {
   private _buildPreviewFromAnalysis(
     resume: { fileName: string; atsScore: number | null; analysis: { keywords: string[]; missingKeywords: string[] } | null },
   ) {
-    const storedKeywords = resume.analysis?.keywords ?? [];
+    const rawStoredKeywords = resume.analysis?.keywords ?? [];
 
-    // No analysis at all → return a clear empty state the frontend can render nicely
+    // ── Sanitize stored keywords ──
+    // Older / failed analyses sometimes wrote sentinel strings into `keywords`
+    // (e.g. "(unable to extract — upload text-based PDF)"). Those polluted the
+    // "Detected Skills Cloud" with garbage. Filter aggressively: a real skill
+    // is a short, mostly-alphanumeric token without parentheses or stop-phrases.
+    const JUNK_PATTERNS = /unable|failed|extract|placeholder|n\/a|none|please|upload|text-based|scanned|empty|error/i;
+    const storedKeywords = rawStoredKeywords.filter((k) => {
+      if (typeof k !== "string") return false;
+      const trimmed = k.trim();
+      if (trimmed.length === 0 || trimmed.length > 40) return false;
+      if (/[()[\]{}<>]/.test(trimmed)) return false;
+      if (JUNK_PATTERNS.test(trimmed)) return false;
+      return true;
+    });
+
+    // No usable analysis → return a clear empty state the frontend can render nicely
     if (storedKeywords.length === 0) {
       return {
         fullText: "",

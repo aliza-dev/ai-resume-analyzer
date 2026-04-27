@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import {
   Eye, Upload, Sparkles, FileText, Code2,
-  CheckCircle2, Zap, Heart, BookOpen, AlertCircle, RefreshCw,
+  CheckCircle2, Zap, Heart, BookOpen, AlertCircle, RefreshCw, FlaskConical,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -14,6 +14,46 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { resumeApi } from "@/api/resume";
 import type { Resume, ResumePreview } from "@/types";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Demo data — used by the "Try demo data" button so users can verify the
+// UI is wired correctly even when the backend hasn't returned real data yet
+// (e.g. file expired on Vercel, or stored analysis is empty).
+// ─────────────────────────────────────────────────────────────────────────────
+const DEMO_PREVIEW: ResumePreview = {
+  fullText:
+    "PROFESSIONAL SUMMARY\nFull-stack engineer with 5+ years building scalable web apps in React, Node.js and AWS. Led migration from monolith to microservices, reducing deploy time by 60%.\n\nEXPERIENCE\nSenior Software Engineer — Acme Corp (2022 – Present)\n• Architected a real-time collaboration platform using React, Socket.io and Redis serving 200K+ daily users.\n• Optimized PostgreSQL queries and added caching, cutting API p95 latency from 800ms to 120ms.\n• Mentored 4 junior engineers and led code reviews across 3 product teams.\n\nSKILLS\nReact, TypeScript, Node.js, Python, Docker, Kubernetes, AWS, PostgreSQL, Redis, GraphQL, Tailwind CSS, Git, CI/CD, Jest, Playwright\n\nEDUCATION\nB.S. Computer Science — State University, 2019\n\nPROJECTS\nOpen-source contributor to Next.js plugins; built a Tailwind-based component library used by 1.2K developers.",
+  wordCount: 142,
+  sections: [
+    { name: "Summary", content: "Full-stack engineer with 5+ years building scalable web apps in React, Node.js and AWS. Led migration from monolith to microservices, reducing deploy time by 60%.", color: "#6366f1" },
+    { name: "Experience", content: "Senior Software Engineer — Acme Corp (2022 – Present)\n• Architected a real-time collaboration platform using React, Socket.io and Redis serving 200K+ daily users.\n• Optimized PostgreSQL queries and added caching, cutting API p95 latency from 800ms to 120ms.\n• Mentored 4 junior engineers and led code reviews across 3 product teams.", color: "#22c55e" },
+    { name: "Skills", content: "React, TypeScript, Node.js, Python, Docker, Kubernetes, AWS, PostgreSQL, Redis, GraphQL, Tailwind CSS, Git, CI/CD, Jest, Playwright", color: "#f59e0b" },
+    { name: "Education", content: "B.S. Computer Science — State University, 2019", color: "#3b82f6" },
+    { name: "Projects", content: "Open-source contributor to Next.js plugins; built a Tailwind-based component library used by 1.2K developers.", color: "#ec4899" },
+  ],
+  highlights: {
+    techKeywords: ["React", "TypeScript", "Node.js", "Python", "Docker", "Kubernetes", "AWS", "PostgreSQL", "Redis", "GraphQL", "Tailwind CSS", "Git", "Jest", "Playwright", "Next.js", "Socket.io"],
+    softSkills: ["Mentored", "Led", "Architected", "Optimized"],
+    actionVerbs: ["Architected", "Optimized", "Mentored", "Led", "Built", "Reduced"],
+    dynamicSkills: ["CI/CD", "Microservices", "Real-time", "Component library"],
+  },
+  topSkills: [
+    { skill: "React", count: 8 }, { skill: "TypeScript", count: 6 }, { skill: "Node.js", count: 5 },
+    { skill: "AWS", count: 5 }, { skill: "Docker", count: 4 }, { skill: "PostgreSQL", count: 4 },
+    { skill: "Python", count: 3 }, { skill: "Kubernetes", count: 3 }, { skill: "Redis", count: 3 },
+    { skill: "GraphQL", count: 2 }, { skill: "Tailwind CSS", count: 2 }, { skill: "Jest", count: 2 },
+  ],
+  industryClassification: {
+    industries: [
+      { name: "Software Engineering", confidence: 92, topMatches: ["React", "Node.js", "TypeScript"] },
+      { name: "Cloud / DevOps", confidence: 64, topMatches: ["AWS", "Docker", "Kubernetes"] },
+      { name: "Full-Stack Web", confidence: 58, topMatches: ["React", "PostgreSQL", "GraphQL"] },
+    ],
+    primary: "Software Engineering",
+  },
+  fileAvailable: true,
+  needsAnalysis: false,
+};
 
 const SKILL_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316",
@@ -56,6 +96,9 @@ export function VisualizationsPage() {
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [activeHighlight, setActiveHighlight] = useState<"tech" | "soft" | "verbs" | "dynamic">("tech");
+  // True when the user opts into demo data so they can verify the UI
+  // pipeline without depending on backend response.
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +114,7 @@ export function VisualizationsPage() {
   // Auto-fetch visualization when resume selection changes
   useEffect(() => {
     if (!selectedResumeId) return;
+    if (isDemo) return; // skip network when in demo mode
     let cancelled = false;
     setPreview(null);
     setPreviewError(null);
@@ -85,10 +129,15 @@ export function VisualizationsPage() {
       })
       .finally(() => { if (!cancelled) setIsPreviewLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedResumeId]);
+  }, [selectedResumeId, isDemo]);
 
   const handleLoad = async () => {
     if (!selectedResumeId) return;
+    if (isDemo) {
+      setPreview(DEMO_PREVIEW);
+      toast.success("Loaded demo data — switch off to see your real resume", { id: "viz" });
+      return;
+    }
     setIsPreviewLoading(true);
     setPreviewError(null);
     toast.loading("Refreshing…", { id: "viz" });
@@ -110,6 +159,44 @@ export function VisualizationsPage() {
     }
     finally { setIsPreviewLoading(false); }
   };
+
+  const toggleDemo = () => {
+    setIsDemo((prev) => {
+      const next = !prev;
+      if (next) {
+        setPreview(DEMO_PREVIEW);
+        setPreviewError(null);
+        toast.success("Demo data on — UI rendering with sample resume", { id: "viz" });
+      } else {
+        setPreview(null);
+        toast.message("Demo data off — fetching your real resume", { id: "viz" });
+      }
+      return next;
+    });
+  };
+
+  // ── Empty-state detection ──
+  // The backend can legitimately return an "empty" preview in two cases:
+  //   1) `needsAnalysis: true` (no analysis yet) → handled with its own card below
+  //   2) `fileAvailable: false` + populated stored keywords → handled with a banner
+  // But there's a third "broken" case the screenshots showed: response has no
+  // skills, no text, no sections, AND no fileAvailable/needsAnalysis flags
+  // (e.g. legacy backend deploy, or extraction succeeded with junk content).
+  // In that case we render a single helpful empty state instead of four
+  // separate sub-cards each saying "no data" — which looked broken to users.
+  const isEffectivelyEmpty = useMemo(() => {
+    if (!preview) return false;
+    if (preview.needsAnalysis) return false;
+    const noSkills = (preview.topSkills?.length ?? 0) === 0;
+    const noText = !preview.fullText || preview.fullText.trim().length === 0;
+    const noSections = (preview.sections?.length ?? 0) === 0;
+    const noHighlights =
+      (preview.highlights?.techKeywords?.length ?? 0) === 0 &&
+      (preview.highlights?.softSkills?.length ?? 0) === 0 &&
+      (preview.highlights?.actionVerbs?.length ?? 0) === 0 &&
+      (preview.highlights?.dynamicSkills?.length ?? 0) === 0;
+    return noSkills && noText && noSections && noHighlights;
+  }, [preview]);
 
   // Skills for highlighting (safe access)
   const highlightKeywords = useMemo(() => {
@@ -149,11 +236,23 @@ export function VisualizationsPage() {
           <CardContent className="flex min-w-0 flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4">
             <div className="min-w-0 flex-1 space-y-1">
               <label className="text-xs font-medium text-gray-500">Select Resume</label>
-              <select value={selectedResumeId} onChange={(e) => setSelectedResumeId(e.target.value)}
-                className="flex h-10 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+              <select
+                value={selectedResumeId}
+                onChange={(e) => setSelectedResumeId(e.target.value)}
+                disabled={isDemo}
+                className="flex h-10 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              >
                 {resumes.map((r) => <option key={r.id} value={r.id}>{r.fileName} — {new Date(r.createdAt).toLocaleDateString()}</option>)}
               </select>
             </div>
+            <Button
+              onClick={toggleDemo}
+              variant={isDemo ? "default" : "outline"}
+              className="w-full gap-2 sm:w-auto sm:shrink-0"
+              title="Render the page with sample data so you can verify UI components"
+            >
+              <FlaskConical className="h-4 w-4" /> {isDemo ? "Demo: ON" : "Try demo data"}
+            </Button>
             <Button onClick={handleLoad} isLoading={isPreviewLoading} className="w-full gap-2 shadow-lg shadow-brand-500/25 sm:w-auto sm:shrink-0">
               <Eye className="h-4 w-4" /> {preview ? "Refresh" : "Visualize"}
             </Button>
@@ -230,7 +329,7 @@ export function VisualizationsPage() {
       )}
 
       {/* File-unavailable banner (preview still works from stored analysis) */}
-      {preview && !preview.needsAnalysis && preview.fileAvailable === false && (
+      {preview && !preview.needsAnalysis && !isEffectivelyEmpty && preview.fileAvailable === false && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/40 dark:bg-amber-900/10">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
@@ -245,7 +344,59 @@ export function VisualizationsPage() {
         </motion.div>
       )}
 
-      {preview && !preview.needsAnalysis && (
+      {/* Demo-mode banner */}
+      {isDemo && preview && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="flex items-start gap-3 rounded-xl border border-purple-200 bg-purple-50 p-4 text-sm dark:border-purple-900/40 dark:bg-purple-900/10">
+            <FlaskConical className="mt-0.5 h-5 w-5 shrink-0 text-purple-500" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-purple-800 dark:text-purple-200">Demo data is active</p>
+              <p className="text-xs text-purple-700/80 dark:text-purple-300/80">
+                You're seeing a sample resume so you can confirm charts, skills cloud and highlights work.
+                Click <span className="font-semibold">Demo: ON</span> again to switch back to your real resume.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Unified empty state — covers legacy/broken responses and ensures the
+          page never shows four separate "no data" sub-cards. */}
+      {preview && !preview.needsAnalysis && isEffectivelyEmpty && !isDemo && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center gap-4 py-14 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/20">
+                <AlertCircle className="h-7 w-7 text-amber-500" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No visualization data for this resume</h3>
+                <p className="mx-auto max-w-md text-sm text-gray-500 dark:text-gray-400">
+                  We couldn't load any skills, technologies or text for the selected resume. The most common causes are:
+                </p>
+              </div>
+              <ul className="mx-auto max-w-md space-y-1.5 text-left text-xs text-gray-500 dark:text-gray-400">
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500" /> The original file expired on the server (Vercel /tmp is ephemeral).</li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500" /> The resume is image-based / scanned and text extraction returned nothing.</li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500" /> The analysis hasn't completed for this resume yet.</li>
+              </ul>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                <Link to={`/analysis?resumeId=${selectedResumeId}`}>
+                  <Button className="gap-2"><Sparkles className="h-4 w-4" /> Run analysis</Button>
+                </Link>
+                <Link to="/upload">
+                  <Button variant="outline" className="gap-2"><Upload className="h-4 w-4" /> Re-upload as text PDF</Button>
+                </Link>
+                <Button variant="ghost" onClick={toggleDemo} className="gap-2">
+                  <FlaskConical className="h-4 w-4" /> Try demo data
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {preview && !preview.needsAnalysis && !isEffectivelyEmpty && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
 
           {/* ═══ SKILLS CLOUD ═══ */}

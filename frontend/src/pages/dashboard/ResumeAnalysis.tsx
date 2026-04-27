@@ -406,6 +406,17 @@ export function ResumeAnalysisPage() {
     );
   }
 
+  // Detect "degenerate" stored analysis where every score is essentially zero.
+  // This happens when an earlier analysis run produced bad output (e.g., the
+  // resume was image-based and OCR failed, or the LLM returned junk).
+  // We show a banner instead of misleading 0%/1% gauges so the user knows to re-run.
+  const sectionSum = analysis
+    ? analysis.skillsScore + analysis.experienceScore + analysis.educationScore + analysis.projectsScore
+    : 0;
+  const atsValue = resume?.atsScore ?? 0;
+  const isAnalysisDegenerate =
+    !!analysis && (sectionSum <= 5 || (atsValue < 5 && sectionSum < 30));
+
   return (
     <div className="space-y-6">
       <motion.div
@@ -433,6 +444,48 @@ export function ResumeAnalysisPage() {
           )}
         </div>
       </motion.div>
+
+      {isAnalysisDegenerate && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-500/40 dark:bg-amber-500/10"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                  This analysis looks incomplete
+                </p>
+                <p className="mt-1 text-xs text-amber-800 dark:text-amber-300/90">
+                  Every section scored near zero, which usually means the resume
+                  text couldn't be extracted properly (often happens with
+                  image-based or scanned PDFs). Re-run the analysis below, or
+                  re-upload a text-based PDF (exported from Word/Google Docs).
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button
+                onClick={handleAnalyze}
+                isLoading={isAnalyzing}
+                size="sm"
+                className="gap-2"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Re-run analysis
+              </Button>
+              <Link to="/upload">
+                <Button size="sm" variant="outline" className="gap-2">
+                  <Upload className="h-3.5 w-3.5" />
+                  Re-upload
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       <AnimatePresence mode="wait">
         {analysis ? (
