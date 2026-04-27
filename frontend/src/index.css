@@ -54,6 +54,10 @@
   /* Glassmorphism card */
   .glass-card {
     @apply rounded-2xl border border-gray-200 bg-white shadow-sm;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  }
+  .glass-card:hover {
+    border-color: rgba(99, 102, 241, 0.35);
   }
   .dark .glass-card {
     background: rgba(255, 255, 255, 0.04);
@@ -100,6 +104,22 @@
   .scrollbar-thin::-webkit-scrollbar { width: 6px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
   .scrollbar-thin::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 3px; }
+
+  /* Smooth, reliable mobile scrolling for the dashboard's main content area.
+     Without these, iOS Safari/Chrome can "stick" momentum scroll inside nested
+     overflow containers and overscroll bounce can cancel touch gestures. */
+  .dashboard-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+  }
+
+  /* h-screen uses 100vh which on mobile browsers includes the URL bar height,
+     making the layout taller than the actual visible viewport and breaking
+     nested scroll containers. dvh = dynamic viewport height. */
+  .dvh-screen {
+    height: 100dvh;
+  }
 
   /* Mobile-first heading alignment: centered on small, left on md+ */
   .heading-responsive {

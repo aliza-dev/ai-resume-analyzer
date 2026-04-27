@@ -178,6 +178,10 @@ export interface ResumePreview {
     industries: { name: string; confidence: number; topMatches: string[] }[];
     primary: string;
   };
+  /** True when original resume file text was extracted; false when preview was rebuilt from stored analysis only */
+  fileAvailable?: boolean;
+  /** True when the resume has no stored analysis yet — user should run Analysis first */
+  needsAnalysis?: boolean;
 }
 
 export interface HiringProbability {

@@ -163,54 +163,64 @@ export function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-1">
                 {/* Dark Mode Toggle */}
-                <div className="flex items-center justify-between rounded-xl border border-gray-100 p-4 transition-colors hover:bg-gray-50 dark:border-gray-700/60 dark:hover:bg-white/[0.02]">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 p-4 transition-colors hover:bg-gray-50 dark:border-gray-700/60 dark:hover:bg-white/[0.02]">
+                  <div className="flex min-w-0 items-center gap-3">
                     {theme === "dark" ? (
-                      <Moon className="h-5 w-5 text-indigo-400" />
+                      <Moon className="h-5 w-5 shrink-0 text-indigo-400" />
                     ) : (
-                      <Sun className="h-5 w-5 text-amber-500" />
+                      <Sun className="h-5 w-5 shrink-0 text-amber-500" />
                     )}
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-white">Dark Mode</p>
-                      <p className="text-xs text-gray-500 dark:text-slate-400">
+                      <p className="truncate text-xs text-gray-500 dark:text-slate-400">
                         {theme === "dark" ? "Currently using dark theme" : "Currently using light theme"}
                       </p>
                     </div>
                   </div>
                   <button
+                    type="button"
+                    role="switch"
+                    aria-checked={theme === "dark"}
+                    aria-label="Toggle dark mode"
                     onClick={toggleTheme}
-                    className={`relative h-6 w-11 rounded-full transition-colors ${
-                      theme === "dark" ? "bg-indigo-500" : "bg-gray-300"
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 ${
+                      theme === "dark" ? "bg-indigo-500" : "bg-gray-300 dark:bg-gray-600"
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                        theme === "dark" ? "translate-x-[22px]" : "translate-x-0.5"
+                      aria-hidden="true"
+                      className={`pointer-events-none block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out ${
+                        theme === "dark" ? "translate-x-5" : "translate-x-0"
                       }`}
                     />
                   </button>
                 </div>
 
                 {/* Email Notifications Toggle */}
-                <div className="flex items-center justify-between rounded-xl border border-gray-100 p-4 transition-colors hover:bg-gray-50 dark:border-gray-700/60 dark:hover:bg-white/[0.02]">
-                  <div className="flex items-center gap-3">
-                    <Bell className={`h-5 w-5 ${emailNotif ? "text-green-500" : "text-gray-400"}`} />
-                    <div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 p-4 transition-colors hover:bg-gray-50 dark:border-gray-700/60 dark:hover:bg-white/[0.02]">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Bell className={`h-5 w-5 shrink-0 ${emailNotif ? "text-green-500" : "text-gray-400"}`} />
+                    <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-white">Email Notifications</p>
-                      <p className="text-xs text-gray-500 dark:text-slate-400">
+                      <p className="truncate text-xs text-gray-500 dark:text-slate-400">
                         Receive tips and analysis reminders
                       </p>
                     </div>
                   </div>
                   <button
+                    type="button"
+                    role="switch"
+                    aria-checked={emailNotif}
+                    aria-label="Toggle email notifications"
                     onClick={() => setEmailNotif(!emailNotif)}
-                    className={`relative h-6 w-11 rounded-full transition-colors ${
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500/50 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 ${
                       emailNotif ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                        emailNotif ? "translate-x-[22px]" : "translate-x-0.5"
+                      aria-hidden="true"
+                      className={`pointer-events-none block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out ${
+                        emailNotif ? "translate-x-5" : "translate-x-0"
                       }`}
                     />
                   </button>

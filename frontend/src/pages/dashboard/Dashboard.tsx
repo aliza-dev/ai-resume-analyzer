@@ -245,8 +245,8 @@ export function DashboardPage() {
         </div>
       ) : (
         <motion.div variants={itemVariants}>
-          <Card className="overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-brand-50 to-purple-50 dark:from-brand-900/10 dark:to-purple-900/10" />
+          <Card className="relative overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-50 to-purple-50 dark:from-brand-900/10 dark:to-purple-900/10" />
             <CardContent className="relative flex flex-col items-center justify-center py-16">
               <motion.div
                 animate={{ y: [0, -8, 0] }}

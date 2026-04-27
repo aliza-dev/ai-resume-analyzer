@@ -17,7 +17,7 @@ export function DashboardTopBar() {
   if (!isToolPage) return null;
 
   return (
-    <div className="min-w-0 border-b border-gray-200 bg-white/80 backdrop-blur-sm dark:border-white/[0.06] dark:bg-slate-950/80">
+    <div className="min-w-0 border-b border-gray-200 bg-white backdrop-blur-sm supports-[backdrop-filter]:bg-white/80 dark:border-white/[0.06] dark:bg-slate-950 dark:supports-[backdrop-filter]:bg-slate-950/80">
       <nav className="flex min-w-0 overflow-x-auto scrollbar-thin">
         {steps.map((step, i) => {
           const isActive = pathname.startsWith(step.to);

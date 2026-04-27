@@ -8,7 +8,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "glass-card rounded-2xl transition-colors duration-200 hover:border-indigo-500/50",
+        "glass-card relative rounded-2xl transition-colors duration-200 hover:border-indigo-500/50",
         className
       )}
       {...props}

@@ -2236,7 +2236,26 @@ export class AnalysisService {
   async getResumePreview(resumeId: string, userId: string) {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
-    const text = await this._getResumeTextWithFallback(resume);
+
+    // ── Try to extract text from the actual file ──
+    // On Vercel, /tmp is ephemeral so files uploaded in a previous invocation are gone.
+    let text = "";
+    try {
+      text = await extractTextFromFile(resume.fileUrl);
+    } catch (err) {
+      console.warn("[Preview] File extraction failed:", err);
+    }
+
+    const fileTextOk = text.trim().length > 0 && text.split(/\s+/).length >= 20;
+
+    // ── If the file is gone but we have stored Analysis, build the preview from
+    //    stored keywords directly (no synthetic-text reconstruction). ──
+    if (!fileTextOk) {
+      console.log(`[Preview] File text unavailable for ${resume.fileName} — building preview from stored analysis`);
+      return this._buildPreviewFromAnalysis(resume);
+    }
+
+    // ── Normal path: file is available, run full NLP pipeline ──
     const sections = extractSections(text);
     const nlp = runNlpAnalysis(text, AnalysisEngine.TECH_KEYWORDS);
     const lower = text.toLowerCase();
@@ -2300,6 +2319,73 @@ export class AnalysisService {
       },
       topSkills,
       industryClassification: nlp.industryClassification,
+      fileAvailable: true,
+    };
+  }
+
+  /**
+   * Build a usable resume-preview response from stored Analysis data only,
+   * for cases where the original file is no longer accessible
+   * (e.g., Vercel /tmp expired between invocations).
+   */
+  private _buildPreviewFromAnalysis(
+    resume: { fileName: string; atsScore: number | null; analysis: { keywords: string[]; missingKeywords: string[] } | null },
+  ) {
+    const storedKeywords = resume.analysis?.keywords ?? [];
+
+    // No analysis at all → return a clear empty state the frontend can render nicely
+    if (storedKeywords.length === 0) {
+      return {
+        fullText: "",
+        wordCount: 0,
+        sections: [] as { name: string; content: string; color: string }[],
+        highlights: { techKeywords: [], softSkills: [], actionVerbs: [], dynamicSkills: [] },
+        topSkills: [] as { skill: string; count: number }[],
+        industryClassification: { industries: [], primary: "General" },
+        fileAvailable: false,
+        needsAnalysis: true,
+      };
+    }
+
+    // Match stored keywords against our known dictionaries to populate highlights
+    const lowerKw = storedKeywords.map((k) => k.toLowerCase());
+    const techFound = AnalysisEngine.TECH_KEYWORDS.filter((k) => lowerKw.includes(k.toLowerCase()));
+    const softFound = AnalysisEngine.SOFT_SKILLS.filter((k) => lowerKw.includes(k.toLowerCase()));
+    // We can't reconstruct action verbs without the text, so leave empty
+    const verbsFound: string[] = [];
+
+    // Anything in storedKeywords that wasn't a known tech keyword → treat as dynamic skill
+    const knownTechLower = new Set(AnalysisEngine.TECH_KEYWORDS.map((k) => k.toLowerCase()));
+    const knownSoftLower = new Set(AnalysisEngine.SOFT_SKILLS.map((k) => k.toLowerCase()));
+    const dynamicSkills = storedKeywords.filter(
+      (k) => !knownTechLower.has(k.toLowerCase()) && !knownSoftLower.has(k.toLowerCase())
+    );
+
+    // topSkills: synthesize descending counts so the bar chart still has visual weight order
+    const allSkills = [...new Set([...techFound, ...dynamicSkills])];
+    const topSkills = allSkills.slice(0, 15).map((skill, i) => ({
+      skill,
+      count: Math.max(1, allSkills.length - i),
+    }));
+
+    // Run industry classification on a comma-joined keyword string
+    const keywordBlob = storedKeywords.join(", ");
+    const industryClassification = classifyIndustry(keywordBlob);
+
+    return {
+      fullText: "",
+      wordCount: 0,
+      sections: [] as { name: string; content: string; color: string }[],
+      highlights: {
+        techKeywords: techFound,
+        softSkills: softFound,
+        actionVerbs: verbsFound,
+        dynamicSkills,
+      },
+      topSkills,
+      industryClassification,
+      fileAvailable: false,
+      needsAnalysis: false,
     };
   }
 

@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import {
   Eye, Upload, Sparkles, FileText, Code2,
-  CheckCircle2, Zap, Heart, BookOpen,
+  CheckCircle2, Zap, Heart, BookOpen, AlertCircle, RefreshCw,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -54,6 +54,7 @@ export function VisualizationsPage() {
   const [preview, setPreview] = useState<ResumePreview | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [activeHighlight, setActiveHighlight] = useState<"tech" | "soft" | "verbs" | "dynamic">("tech");
 
   useEffect(() => {
@@ -72,10 +73,16 @@ export function VisualizationsPage() {
     if (!selectedResumeId) return;
     let cancelled = false;
     setPreview(null);
+    setPreviewError(null);
     setIsPreviewLoading(true);
     resumeApi.getResumePreview(selectedResumeId)
       .then((r) => { if (!cancelled) setPreview(r); })
-      .catch(() => { if (!cancelled) toast.error("Failed to load visualization data", { id: "viz" }); })
+      .catch((err) => {
+        if (cancelled) return;
+        const msg = err?.response?.data?.message || "Failed to load visualization data";
+        setPreviewError(msg);
+        toast.error(msg, { id: "viz" });
+      })
       .finally(() => { if (!cancelled) setIsPreviewLoading(false); });
     return () => { cancelled = true; };
   }, [selectedResumeId]);
@@ -83,12 +90,24 @@ export function VisualizationsPage() {
   const handleLoad = async () => {
     if (!selectedResumeId) return;
     setIsPreviewLoading(true);
+    setPreviewError(null);
     toast.loading("Refreshing…", { id: "viz" });
     try {
       const r = await resumeApi.getResumePreview(selectedResumeId);
       setPreview(r);
-      toast.success(`${r.wordCount} words parsed, ${r.sections.length} sections found!`, { id: "viz" });
-    } catch { toast.error("Failed to load", { id: "viz" }); }
+      if (r.needsAnalysis) {
+        toast.info("Analyze your resume first to unlock full visualizations", { id: "viz" });
+      } else if (r.fileAvailable === false) {
+        toast.success(`Loaded ${r.topSkills.length} skills from your stored analysis`, { id: "viz" });
+      } else {
+        toast.success(`${r.wordCount} words parsed, ${r.sections.length} sections found!`, { id: "viz" });
+      }
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string } } };
+      const msg = e?.response?.data?.message || "Failed to load visualization data";
+      setPreviewError(msg);
+      toast.error(msg, { id: "viz" });
+    }
     finally { setIsPreviewLoading(false); }
   };
 
@@ -161,7 +180,72 @@ export function VisualizationsPage() {
         </motion.div>
       )}
 
-      {preview && (
+      {/* Error state — request failed */}
+      {!isPreviewLoading && previewError && !preview && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 dark:bg-red-900/20">
+                <AlertCircle className="h-7 w-7 text-red-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Couldn't load visualization</h3>
+              <p className="max-w-md text-sm text-gray-500 dark:text-gray-400">{previewError}</p>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                <Button onClick={handleLoad} variant="outline" className="gap-2">
+                  <RefreshCw className="h-4 w-4" /> Try again
+                </Button>
+                <Link to="/upload">
+                  <Button className="gap-2"><Upload className="h-4 w-4" /> Upload new resume</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Needs-analysis state — resume in DB but never analyzed AND file is gone */}
+      {preview && preview.needsAnalysis && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/20">
+                <Sparkles className="h-7 w-7 text-amber-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Analyze your resume first</h3>
+              <p className="max-w-md text-sm text-gray-500 dark:text-gray-400">
+                We couldn't read your resume file (it may have expired on the server). Run analysis once to unlock the
+                skills cloud, top technologies, and AI-highlighted preview here.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                <Link to={`/analysis?resumeId=${selectedResumeId}`}>
+                  <Button className="gap-2"><Sparkles className="h-4 w-4" /> Run analysis</Button>
+                </Link>
+                <Link to="/upload">
+                  <Button variant="outline" className="gap-2"><Upload className="h-4 w-4" /> Upload new resume</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* File-unavailable banner (preview still works from stored analysis) */}
+      {preview && !preview.needsAnalysis && preview.fileAvailable === false && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/40 dark:bg-amber-900/10">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-amber-800 dark:text-amber-200">Showing visualization from stored analysis</p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
+                The original resume file is no longer accessible on the server, so the resume text preview is unavailable.
+                Re-upload the file to see section-level highlights.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {preview && !preview.needsAnalysis && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
 
           {/* ═══ SKILLS CLOUD ═══ */}
@@ -281,6 +365,7 @@ export function VisualizationsPage() {
           </div>
 
           {/* ═══ RESUME PREVIEW WITH HIGHLIGHTS ═══ */}
+          {preview.fileAvailable !== false && (
           <Card>
             <CardHeader>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -362,6 +447,7 @@ export function VisualizationsPage() {
               </div>
             </CardContent>
           </Card>
+          )}
         </motion.div>
       )}
     </div>

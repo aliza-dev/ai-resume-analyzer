@@ -20,7 +20,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
 
   return (
     <header
-      className="sticky top-0 z-30 flex w-full min-h-16 flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-gray-200 bg-white/80 px-3 py-2 backdrop-blur-xl dark:border-white/[0.06] dark:bg-slate-950/80 sm:min-h-16 sm:gap-3 sm:px-4 sm:py-0 md:gap-3 lg:px-6"
+      className="sticky top-0 z-30 flex w-full min-h-16 items-center justify-between gap-x-2 border-b border-gray-200 bg-white px-3 py-2 backdrop-blur-xl supports-[backdrop-filter]:bg-white/80 dark:border-white/[0.06] dark:bg-slate-950 dark:supports-[backdrop-filter]:bg-slate-950/80 sm:min-h-16 sm:gap-3 sm:px-4 sm:py-0 md:gap-3 lg:px-6"
     >
       <div className="flex min-h-10 min-w-0 flex-1 basis-0 items-center gap-2 sm:gap-3">
         <button
