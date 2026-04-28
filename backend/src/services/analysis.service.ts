@@ -17,6 +17,22 @@ import {
   extractTextWithGeminiVision,
 } from "./llm.service";
 import type { ChatHistoryTurn } from "./llm.service";
+import { ClientError } from "../utils/http-errors";
+import { RateLimitError } from "../middlewares/errorHandler";
+
+/** Minimum word count to run scoring / LLM — below this we reject (no hallucinated scores). */
+const MIN_WORDS_FOR_SCORING = 50;
+/** If pdf-parse yields fewer words than this, try Gemini Vision (may recover scanned PDFs). */
+const MIN_WORDS_TRY_GEMINI_AFTER_PDF = 25;
+
+function countWords(s: string): number {
+  return s.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** Legacy failed runs stored this sentence as `storedResumeText` — never score or preview it as real content. */
+function looksLikeExtractionPlaceholder(text: string): boolean {
+  return /could not be parsed for text content/i.test(text);
+}
 
 /**
  * Detect failed / glitched analysis suitable for discarding in favor of
@@ -177,7 +193,7 @@ async function extractTextFromFile(filePath: string): Promise<string> {
       const buffer = fs.readFileSync(resolvedPath);
       const data = await pdfParse(buffer);
       rawText = data.text || "";
-      const w = (rawText || "").split(/\s+/).filter(Boolean).length;
+      const w = countWords(rawText);
       console.log(
         `[Parser] PDF ${path.basename(resolvedPath)}: ${buffer.length} bytes → pdf-parse word count: ${w}` +
         (w === 0 ? " (empty — may be image-only or protected)" : ` — preview: ${(rawText || "").slice(0, 120).replace(/\s+/g, " ")}…`),
@@ -190,14 +206,26 @@ async function extractTextFromFile(filePath: string): Promise<string> {
     }
   } catch (error) {
     console.error("Text extraction error:", error);
-    return "";
+    rawText = "";
+    // PDF: continue — we may recover via Gemini Vision below
+    if (ext !== ".pdf") {
+      return "";
+    }
   }
 
-  // If pdf-parse returns empty text (scanned/image PDF), use Gemini Vision OCR
-  if (!rawText.trim() && isLlmAvailable()) {
-    console.log(`[Parser] pdf-parse returned empty — trying Gemini Vision OCR for: ${path.basename(resolvedPath)}`);
+  // Weak or empty PDF text: try Gemini Vision (handles many scanned PDFs pdf-parse cannot read).
+  // Future option: add Tesseract.js or cloud OCR (Textract, Document AI) when API keys are absent.
+  const pdfNeedsVision =
+    ext === ".pdf" &&
+    isLlmAvailable() &&
+    (!rawText.trim() || countWords(rawText) < MIN_WORDS_TRY_GEMINI_AFTER_PDF);
+
+  if (pdfNeedsVision) {
+    console.log(
+      `[Parser] pdf-parse yielded ${countWords(rawText)} words — trying Gemini Vision OCR for: ${path.basename(resolvedPath)}`,
+    );
     const geminiText = await extractTextWithGeminiVision(resolvedPath);
-    if (geminiText.trim()) {
+    if (geminiText.trim() && (!rawText.trim() || countWords(geminiText) > countWords(rawText))) {
       rawText = geminiText;
     }
   }
@@ -213,6 +241,7 @@ async function extractTextFromFile(filePath: string): Promise<string> {
   const normalized = normalizeResumeText(rawText);
 
   console.log(`[Parser] Extracted ${normalized.split(/\s+/).length} words from ${path.basename(resolvedPath)}`);
+  console.log("[Parser] Extracted Text Length:", normalized.length);
 
   return normalized;
 }
@@ -2014,13 +2043,35 @@ export class AnalysisService {
 
     let resumeText = await extractTextFromFile(resume.fileUrl);
 
-    // If no text extracted even after Gemini Vision OCR, use minimal fallback
     if (!resumeText.trim()) {
-      console.warn("[Analysis] ⚠️ No text extracted — using minimal fallback analysis");
-      resumeText = `Resume file: ${resume.fileName}. This resume could not be parsed for text content. It may be an image-based or scanned PDF. For best results, upload a text-based PDF created from Word or Google Docs.`;
+      throw new ClientError(
+        "Could not extract text from this PDF. It may be scanned, image-only, or password-protected. " +
+          "Export a text-based PDF from Word or Google Docs and try again.",
+        422,
+        "PARSING_FAILED",
+      );
     }
 
-    console.log(`[Analysis] Extracted ${resumeText.split(/\s+/).filter(Boolean).length} words from ${resume.fileName}`);
+    if (looksLikeExtractionPlaceholder(resumeText)) {
+      throw new ClientError(
+        "Stored resume text looks like a failed parse from an earlier run. Re-upload a text-based PDF and analyze again.",
+        422,
+        "PARSING_FAILED",
+      );
+    }
+
+    const extractedWords = countWords(resumeText);
+    if (extractedWords < MIN_WORDS_FOR_SCORING) {
+      throw new ClientError(
+        `Only ${extractedWords} word(s) could be extracted — at least ${MIN_WORDS_FOR_SCORING} are required for a reliable score. ` +
+          "Try a text-based PDF (not a photo scan), or ensure the file is not corrupted.",
+        422,
+        "INSUFFICIENT_TEXT",
+      );
+    }
+
+    console.log(`[Analysis] Extracted ${extractedWords} words from ${resume.fileName}`);
+    console.log("[Analysis] Extracted Text Length:", resumeText.length);
 
     let atsScore: number;
     let skillsScore: number;
@@ -2036,38 +2087,51 @@ export class AnalysisService {
       console.log("[Analysis] Using Gemini AI...");
       console.log(`[Analysis] Resume text being sent to Gemini (${resumeText.split(/\s+/).filter(Boolean).length} words):`);
       console.log(`[Analysis] First 500 chars: ${resumeText.slice(0, 500)}`);
-      const llmResult = await llmAnalyzeResume(resumeText);
-      if (llmResult) {
-        atsScore = llmResult.ats_score;
-        skillsScore = llmResult.skills_score;
-        experienceScore = llmResult.experience_score;
-        educationScore = llmResult.education_score;
-        projectsScore = llmResult.projects_score;
-        keywords = llmResult.matched_keywords;
-        missingKeywords = llmResult.missing_keywords;
-        suggestions = llmResult.suggestions;
-        // Store dimensional metrics for this request
-        (this as unknown as { _lastMetrics?: object })._lastMetrics = {
-          grammarScore: llmResult.grammar_score ?? 70,
-          impactScore: llmResult.impact_score ?? 60,
-          formattingScore: llmResult.formatting_score ?? 70,
-          keywordScore: llmResult.keyword_score ?? 65,
-        };
-        console.log(`[Analysis] ✅ LLM analysis complete — ATS: ${atsScore}%`);
+      let llmResult;
+      try {
+        llmResult = await llmAnalyzeResume(resumeText);
+      } catch (err) {
+        if (err instanceof RateLimitError) throw err;
+        console.error("[Analysis] LLM threw unexpectedly:", err instanceof Error ? err.message : String(err));
+        throw new ClientError(
+          "AI Analysis failed, please try again.",
+          503,
+          "AI_ANALYSIS_FAILED",
+        );
+      }
+      if (!llmResult) {
+        console.error("[Analysis] LLM returned no usable result (invalid JSON or empty after retries)");
+        throw new ClientError(
+          "AI Analysis failed, please try again.",
+          503,
+          "AI_ANALYSIS_FAILED",
+        );
+      }
+      atsScore = llmResult.ats_score;
+      skillsScore = llmResult.skills_score;
+      experienceScore = llmResult.experience_score;
+      educationScore = llmResult.education_score;
+      projectsScore = llmResult.projects_score;
+      keywords = llmResult.matched_keywords;
+      missingKeywords = llmResult.missing_keywords;
+      suggestions = llmResult.suggestions;
+      // Store dimensional metrics for this request
+      (this as unknown as { _lastMetrics?: object })._lastMetrics = {
+        grammarScore: llmResult.grammar_score ?? 70,
+        impactScore: llmResult.impact_score ?? 60,
+        formattingScore: llmResult.formatting_score ?? 70,
+        keywordScore: llmResult.keyword_score ?? 65,
+      };
+      console.log(`[Analysis] ✅ LLM analysis complete — ATS: ${atsScore}%`);
 
-        // ── Sanity check: catch degenerate LLM output (e.g., ats=1, all sections=0)
-        // and fall through to rule-based engine, which uses real text patterns.
-        if (isDegenerateAnalysis(atsScore, skillsScore, experienceScore, educationScore, projectsScore)) {
-          console.warn(
-            `[Analysis] ⚠️ LLM returned degenerate scores (ats=${atsScore}, ` +
-            `skills=${skillsScore}, exp=${experienceScore}, edu=${educationScore}, ` +
-            `proj=${projectsScore}) — falling back to rule-based engine`,
-          );
-          const fb = this._ruleBasedAnalysis(resumeText, resume.fileName);
-          ({ atsScore, skillsScore, experienceScore, educationScore, projectsScore, keywords, missingKeywords, suggestions } = fb);
-        }
-      } else {
-        console.log("[Analysis] ⚠️ LLM failed, using rule-based engine");
+      // ── Sanity check: catch degenerate LLM output (e.g., ats=1, all sections=0)
+      // and fall through to rule-based engine, which uses real text patterns.
+      if (isDegenerateAnalysis(atsScore, skillsScore, experienceScore, educationScore, projectsScore)) {
+        console.warn(
+          `[Analysis] ⚠️ LLM returned degenerate scores (ats=${atsScore}, ` +
+          `skills=${skillsScore}, exp=${experienceScore}, edu=${educationScore}, ` +
+          `proj=${projectsScore}) — falling back to rule-based engine`,
+        );
         const fb = this._ruleBasedAnalysis(resumeText, resume.fileName);
         ({ atsScore, skillsScore, experienceScore, educationScore, projectsScore, keywords, missingKeywords, suggestions } = fb);
       }
@@ -2392,9 +2456,9 @@ export class AnalysisService {
 
     let text = "";
     let usedStoredResumeText = false;
-    if (wordCountOf(fileText) >= 20) {
+    if (wordCountOf(fileText) >= 20 && !looksLikeExtractionPlaceholder(fileText)) {
       text = fileText.slice(0, MAX_TEXT);
-    } else if (wordCountOf(stored) >= 20) {
+    } else if (wordCountOf(stored) >= 20 && !looksLikeExtractionPlaceholder(stored)) {
       text = stored.slice(0, MAX_TEXT);
       usedStoredResumeText = true;
       console.log(`[Preview] Using stored resume text from DB for ${resume.fileName} (${wordCountOf(text)} words)`);
@@ -2403,7 +2467,35 @@ export class AnalysisService {
       usedStoredResumeText = wordCountOf(stored) > wordCountOf(fileText) && stored.length > 0;
     }
 
-    const fileTextOk = text.trim().length > 0 && wordCountOf(text) >= 20;
+    const extractedWordCount = wordCountOf(text);
+
+    if (looksLikeExtractionPlaceholder(text)) {
+      console.log(`[Preview] Extraction placeholder detected for ${resume.fileName} — parsing error UI`);
+      return {
+        fullText: "",
+        wordCount: 0,
+        sections: [
+          {
+            name: "Parsing error",
+            content:
+              "This resume could not be parsed for usable text. It may be a scanned or image-only PDF, or the file is protected. " +
+              "Export a text-based PDF from Word or Google Docs. " +
+              "If you only have a scan, OCR (e.g. Tesseract.js or a cloud Document AI) could be added later to read image-based pages.",
+            color: "#ef4444",
+          },
+        ],
+        highlights: { techKeywords: [], softSkills: [], actionVerbs: [], dynamicSkills: [] },
+        topSkills: [],
+        industryClassification: { industries: [], primary: "General" },
+        fileAvailable: true,
+        needsAnalysis: false,
+        usedStoredResumeText,
+        parsingFailed: true,
+        extractedWordCount,
+      };
+    }
+
+    const fileTextOk = text.trim().length > 0 && extractedWordCount >= 20;
 
     // ── If the file is gone but we have stored Analysis, build the preview from
     //    stored keywords directly (no synthetic-text reconstruction). ──
@@ -2466,7 +2558,7 @@ export class AnalysisService {
 
     return {
       fullText: text,
-      wordCount: text.split(/\s+/).filter(Boolean).length,
+      wordCount: extractedWordCount,
       sections: sectionMap,
       highlights: {
         techKeywords: techFound,
@@ -2478,6 +2570,8 @@ export class AnalysisService {
       industryClassification: nlp.industryClassification,
       fileAvailable: true,
       usedStoredResumeText,
+      parsingFailed: false,
+      extractedWordCount,
     };
   }
 
@@ -2807,6 +2901,22 @@ export class AnalysisService {
     if (!resume) throw new Error("Resume not found");
     const resumeText = await this._getResumeTextWithFallback(resume);
     const accountName = userRow?.name?.trim() || undefined;
+
+    if (looksLikeExtractionPlaceholder(resumeText)) {
+      throw new ClientError(
+        "Resume text is missing or invalid. Upload a text-based PDF and run analysis before generating content.",
+        422,
+        "PARSING_FAILED",
+      );
+    }
+    const wcContent = countWords(resumeText);
+    if (wcContent < MIN_WORDS_FOR_SCORING) {
+      throw new ClientError(
+        `Not enough resume text to generate content (${wcContent} words; need at least ${MIN_WORDS_FOR_SCORING}). Run analysis on a text-based PDF first.`,
+        422,
+        "INSUFFICIENT_TEXT",
+      );
+    }
 
     if (isLlmAvailable() && resumeText.split(/\s+/).length > 10) {
       console.log(`[Content] Using Gemini AI for ${type}...`);

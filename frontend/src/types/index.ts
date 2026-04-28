@@ -204,6 +204,10 @@ export interface ResumePreview {
   needsAnalysis?: boolean;
   /** Preview body was loaded from `storedResumeText` (last analyze) because the PDF was missing or too short */
   usedStoredResumeText?: boolean;
+  /** True when extracted text is unusable (e.g. legacy failed-parse blob) — show parsing error UI, not scores */
+  parsingFailed?: boolean;
+  /** Word count from the text source used for preview (file or stored); for toasts / low-text warnings */
+  extractedWordCount?: number;
 }
 
 export interface HiringProbability {

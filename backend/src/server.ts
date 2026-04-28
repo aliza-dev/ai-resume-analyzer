@@ -1,14 +1,16 @@
-import express, { Router } from "express";
+import express, { Router, type Request } from "express";
 import cors, { type CorsOptions } from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import fs from "fs";
 import path from "path";
 
 import { allowedCorsOrigins, env } from "./config/env";
 import routes from "./routes";
 import statsRouter from "./routes/stats.routes";
 import { errorHandler } from "./middlewares/errorHandler";
+import { ignoreAssetNoise } from "./middlewares/ignoreAssetNoise";
 
 const app = express();
 
@@ -78,15 +80,31 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Static `backend/public` (favicon, etc.) — fall through if missing, then `ignoreAssetNoise` returns 204.
+const publicDir = path.resolve(__dirname, "../public");
+if (fs.existsSync(publicDir)) {
+  app.use(express.static(publicDir, { index: false }));
+}
+app.use(ignoreAssetNoise);
+
 // API — after CORS + body parsers, before morgan / static (statsRouter: GET /api/platform-stats)
 const apiRouter = Router();
 apiRouter.use(statsRouter);
 apiRouter.use(routes);
 app.use("/api", apiRouter);
 
-// Logging
+// Logging — skip noisy asset probes in all environments (Vercel runtime logs)
+const morganSkip = (req: Request) => {
+  const p = req.path.toLowerCase();
+  return (
+    p === "/favicon.ico" ||
+    p === "/favicon.png" ||
+    p === "/apple-touch-icon.png" ||
+    p === "/apple-touch-icon-precomposed.png"
+  );
+};
 if (env.NODE_ENV === "development") {
-  app.use(morgan("dev"));
+  app.use(morgan("dev", { skip: morganSkip }));
 }
 
 // Static files (uploaded resumes)

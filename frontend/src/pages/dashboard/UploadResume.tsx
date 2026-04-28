@@ -139,10 +139,10 @@ export function UploadResumePage() {
         toast.success("Analysis complete!", {
           description: "Redirecting to your results...",
         });
-      } catch {
-        toast.info("Upload successful!", {
-          description: "Click 'Analyze Resume' to see results",
-        });
+      } catch (analyzeErr: unknown) {
+        const ax = analyzeErr as { response?: { data?: { message?: string } } };
+        const msg = ax.response?.data?.message || "Analysis could not complete. You can try Analyze from the Analysis page.";
+        toast.error(msg, { id: "upload-analyze" });
       }
 
       setTimeout(() => {

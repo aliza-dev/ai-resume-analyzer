@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { API_URL } from "@/utils/constants";
+import { fetchPlatformStatsOnce, type PlatformStatsPayload } from "@/api/platformStats";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -354,39 +354,15 @@ const FALLBACK_PLATFORM_STATS = {
  * ═══════════════════════════════════════════════════════════════════ */
 export function HomePage() {
   // --- Platform stats: live from GET /api/platform-stats (Prisma user + resume counts) ---
-  const [platformStats, setPlatformStats] = useState<{
-    users: number;
-    resumesAnalyzed: number;
-    accuracy: number;
-    rating: number;
-  }>({ ...FALLBACK_PLATFORM_STATS });
+  const [platformStats, setPlatformStats] = useState<PlatformStatsPayload>({ ...FALLBACK_PLATFORM_STATS });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const fetchStats = async () => {
-      setIsLoadingStats(true);
-      try {
-        const response = await fetch(`${API_URL}/platform-stats`, {
-          signal: controller.signal,
-          cache: "no-store",
-        });
-        const result = (await response.json()) as {
-          success?: boolean;
-          data?: {
-            users?: number;
-            resumesAnalyzed?: number;
-            accuracy?: number;
-            rating?: number;
-          };
-        };
-
-        if (!response.ok || !result.success || !result.data || typeof result.data !== "object") {
-          setPlatformStats({ ...FALLBACK_PLATFORM_STATS });
-          return;
-        }
-
-        const d = result.data;
+    let cancelled = false;
+    setIsLoadingStats(true);
+    fetchPlatformStatsOnce()
+      .then((d) => {
+        if (cancelled) return;
         setPlatformStats({
           users: d.users != null && Number.isFinite(Number(d.users)) ? Number(d.users) : FALLBACK_PLATFORM_STATS.users,
           resumesAnalyzed:
@@ -402,17 +378,18 @@ export function HomePage() {
               ? Number(d.rating)
               : FALLBACK_PLATFORM_STATS.rating,
         });
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") return;
+      })
+      .catch((error) => {
+        if (cancelled) return;
         console.error("Failed to load platform stats:", error);
         setPlatformStats({ ...FALLBACK_PLATFORM_STATS });
-      } finally {
-        setIsLoadingStats(false);
-      }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingStats(false);
+      });
+    return () => {
+      cancelled = true;
     };
-
-    void fetchStats();
-    return () => controller.abort();
   }, []);
 
   const formatNumber = (num: number) => {

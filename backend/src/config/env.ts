@@ -43,6 +43,10 @@ export const env = {
   /** Raw env value (for logs); use `allowedCorsOrigins` in server for CORS checks */
   CORS_ORIGIN: process.env.CORS_ORIGIN || "http://localhost:3000",
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
+  /** Text-only resume analysis (JSON scoring) — avoid experimental IDs on Vercel */
+  GEMINI_TEXT_MODEL: process.env.GEMINI_TEXT_MODEL || "gemini-1.5-flash",
+  /** PDF/DOCX inline extraction when pdf-parse is weak — same family, document-capable */
+  GEMINI_DOC_MODEL: process.env.GEMINI_DOC_MODEL || "gemini-1.5-flash",
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || "",
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || "",
   STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID || "",

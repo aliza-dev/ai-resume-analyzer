@@ -3,6 +3,7 @@ import * as cheerio from "cheerio";
 import { analysisService } from "../services/analysis.service";
 import { analyzeSchema, jobMatchSchema } from "../validators/analysis";
 import { sendSuccess, sendError } from "../helpers/response";
+import { ClientError } from "../utils/http-errors";
 import { deductCredit } from "../middlewares/credits";
 import type { AuthenticatedRequest } from "../types";
 
@@ -87,12 +88,21 @@ export class AnalysisController {
         return;
       }
       const { resumeId } = analyzeSchema.parse(req.body);
+      console.log("[AnalysisController] analyzeResume start", {
+        resumeId,
+        userId: req.user.userId,
+      });
       const analysis = await analysisService.analyzeResume(
         resumeId,
         req.user.userId
       );
+      console.log("[AnalysisController] analyzeResume OK", { resumeId });
       await sendWithCredit(res, req.user.userId, analysis);
     } catch (error) {
+      if (error instanceof ClientError) {
+        sendError(res, error.message, error.statusCode, { code: error.code });
+        return;
+      }
       if (error instanceof Error && error.message === "Resume not found") {
         sendError(res, error.message, 404);
         return;
@@ -248,6 +258,10 @@ export class AnalysisController {
       );
       await sendWithCredit(res, req.user.userId, result);
     } catch (error) {
+      if (error instanceof ClientError) {
+        sendError(res, error.message, error.statusCode, { code: error.code });
+        return;
+      }
       if (error instanceof Error && error.message === "Resume not found") {
         sendError(res, error.message, 404);
         return;

@@ -292,6 +292,8 @@ export function ResumeAnalysisPage() {
   const [isPdfGenerating, setIsPdfGenerating] = useState(false);
   /** Avoid re-fetching hiring/benchmark/badges when analysis object reference changes without real data change */
   const extrasFetchKeyRef = useRef<string | null>(null);
+  /** Synchronous guard so rapid double-clicks cannot enqueue multiple analyze requests before React re-renders. */
+  const analyzeRequestLockRef = useRef(false);
   useEffect(() => {
     extrasFetchKeyRef.current = null;
   }, [resumeId]);
@@ -337,20 +339,20 @@ export function ResumeAnalysisPage() {
   ];
 
   const handleAnalyze = async () => {
-    if (!resumeId) return;
+    if (!resumeId || analyzeRequestLockRef.current) return;
+    analyzeRequestLockRef.current = true;
     setIsAnalyzing(true);
     setLoadingStage(LOADING_STAGES[0]);
 
-    // Cycle through loading stages
+    let stageInterval: ReturnType<typeof setInterval> | undefined;
     let stageIdx = 0;
-    const stageInterval = setInterval(() => {
+    stageInterval = setInterval(() => {
       stageIdx = (stageIdx + 1) % LOADING_STAGES.length;
       setLoadingStage(LOADING_STAGES[stageIdx]);
     }, 2500);
 
     try {
       const result = await resumeApi.analyze(resumeId);
-      clearInterval(stageInterval);
       setLoadingStage("✅ Analysis complete!");
       setAnalysis(result);
       const updatedResume = await resumeApi.getById(resumeId);
@@ -359,11 +361,12 @@ export function ResumeAnalysisPage() {
         description: `ATS Score: ${updatedResume.atsScore}%`,
       });
     } catch (err: unknown) {
-      clearInterval(stageInterval);
       const error = err as { response?: { data?: { message?: string } } };
       const msg = error.response?.data?.message || "Analysis failed. Please try again.";
       toast.error(msg);
     } finally {
+      if (stageInterval) clearInterval(stageInterval);
+      analyzeRequestLockRef.current = false;
       setIsAnalyzing(false);
       setLoadingStage("");
     }
@@ -481,6 +484,7 @@ export function ResumeAnalysisPage() {
             <Button
               onClick={handleAnalyze}
               isLoading={isAnalyzing}
+              disabled={isAnalyzing}
               className="gap-2 shadow-lg shadow-brand-500/25"
             >
               <Sparkles className="h-4 w-4" />
@@ -515,6 +519,7 @@ export function ResumeAnalysisPage() {
               <Button
                 onClick={handleAnalyze}
                 isLoading={isAnalyzing}
+                disabled={isAnalyzing}
                 size="sm"
                 className="gap-2"
               >
@@ -1262,6 +1267,7 @@ export function ResumeAnalysisPage() {
               <Button
                 onClick={handleAnalyze}
                 isLoading={isAnalyzing}
+                disabled={isAnalyzing}
                 variant="outline"
                 className="gap-2"
               >
@@ -1390,6 +1396,8 @@ export function ResumeAnalysisPage() {
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <Button
                         onClick={handleAnalyze}
+                        isLoading={isAnalyzing}
+                        disabled={isAnalyzing}
                         className="gap-2 glow-brand"
                       >
                         <Sparkles className="h-4 w-4" />

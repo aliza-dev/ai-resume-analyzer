@@ -148,7 +148,21 @@ export function VisualizationsPage() {
     setPreviewError(null);
     setIsPreviewLoading(true);
     resumeApi.getResumePreview(selectedResumeId)
-      .then((r) => { if (!cancelled) setPreview(r); })
+      .then((r) => {
+        if (cancelled) return;
+        setPreview(r);
+        if (r.parsingFailed) {
+          toast.error("Parsing error: we could not read usable text from this resume file.", { id: "viz-parse", duration: 6500 });
+          return;
+        }
+        const wc = r.extractedWordCount ?? r.wordCount ?? 0;
+        if (!r.needsAnalysis && wc > 0 && wc <= 50) {
+          toast.warning(
+            `Only ${wc} words were extracted from this PDF — results may be unreliable. Try a text-based PDF from Word or Google Docs.`,
+            { id: "viz-wc", duration: 6000 },
+          );
+        }
+      })
       .catch((err) => {
         if (cancelled) return;
         const msg = err?.response?.data?.message || "Failed to load visualization data";
@@ -172,11 +186,20 @@ export function VisualizationsPage() {
     try {
       const r = await resumeApi.getResumePreview(selectedResumeId);
       setPreview(r);
-      if (r.needsAnalysis) {
+      if (r.parsingFailed) {
+        toast.error("Parsing error: we could not read usable text from this resume file.", { id: "viz", duration: 6500 });
+      } else if (r.needsAnalysis) {
         toast.info("Analyze your resume first to unlock full visualizations", { id: "viz" });
       } else if (r.fileAvailable === false) {
         toast.success(`Loaded ${r.topSkills.length} skills from your stored analysis`, { id: "viz" });
       } else {
+        const wc = r.extractedWordCount ?? r.wordCount ?? 0;
+        if (wc > 0 && wc <= 50) {
+          toast.warning(
+            `Only ${wc} words were extracted — visualization quality may be poor. Prefer a text-based PDF.`,
+            { id: "viz-wc", duration: 6000 },
+          );
+        }
         toast.success(
           `${r.wordCount} words parsed, ${countNonEmptyPreviewSections(r.sections)} sections found!`,
           { id: "viz" },
@@ -217,6 +240,7 @@ export function VisualizationsPage() {
   // separate sub-cards each saying "no data" — which looked broken to users.
   const isEffectivelyEmpty = useMemo(() => {
     if (!preview) return false;
+    if (preview.parsingFailed) return false;
     if (preview.needsAnalysis) return false;
     const noSkills = (preview.topSkills?.length ?? 0) === 0;
     const noText = !preview.fullText || preview.fullText.trim().length === 0;
@@ -403,7 +427,7 @@ export function VisualizationsPage() {
         </motion.div>
       )}
 
-      {preview?.usedStoredResumeText && preview.fileAvailable && !isDemo && (
+      {preview?.usedStoredResumeText && preview.fileAvailable && !preview.parsingFailed && !isDemo && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm dark:border-sky-900/40 dark:bg-sky-900/10">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-sky-500" />
@@ -472,6 +496,8 @@ export function VisualizationsPage() {
       {preview && !preview.needsAnalysis && !isEffectivelyEmpty && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
 
+          {!preview.parsingFailed && (
+          <>
           {/* ═══ SKILLS CLOUD ═══ */}
           <Card>
             <CardHeader>
@@ -602,6 +628,8 @@ export function VisualizationsPage() {
               </CardContent>
             </Card>
           </div>
+          </>
+          )}
 
           {/* ═══ RESUME PREVIEW WITH HIGHLIGHTS ═══ */}
           {preview.fileAvailable !== false && (
@@ -610,9 +638,14 @@ export function VisualizationsPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2"><Eye className="h-5 w-5 text-brand-500" /> Resume Preview — AI Highlighted</CardTitle>
-                  <CardDescription>See what AI detects in your resume. Click a category to highlight.</CardDescription>
+                  <CardDescription>
+                    {preview.parsingFailed
+                      ? "Parsing error — fix the PDF and re-analyze to restore highlights."
+                      : "See what AI detects in your resume. Click a category to highlight."}
+                  </CardDescription>
                 </div>
                 {/* Highlight toggles */}
+                {!preview.parsingFailed && (
                 <div className="flex flex-wrap gap-1.5">
                   {([
                     { key: "tech" as const, label: "Tech Skills", count: preview.highlights?.techKeywords?.length ?? 0, icon: Code2 },
@@ -639,6 +672,7 @@ export function VisualizationsPage() {
                     );
                   })}
                 </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -671,7 +705,11 @@ export function VisualizationsPage() {
                       </div>
                       {/* Section content with keyword highlights */}
                       <div className="ml-5 whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-                        <HighlightedText text={section.content} keywords={highlightKeywords} color={highlightColor} />
+                        {preview.parsingFailed ? (
+                          <p className="text-sm leading-relaxed">{section.content}</p>
+                        ) : (
+                          <HighlightedText text={section.content} keywords={highlightKeywords} color={highlightColor} />
+                        )}
                       </div>
                     </div>
                     );
@@ -689,10 +727,12 @@ export function VisualizationsPage() {
               </div>
 
               {/* Legend */}
+              {!preview.parsingFailed && (
               <div className="mt-3 flex items-center gap-2 text-[10px] text-gray-500">
                 <mark className="rounded px-1" style={{ backgroundColor: highlightColor + "30", color: highlightColor }}>highlighted</mark>
                 = AI detected {activeHighlight === "tech" ? "technical skills" : activeHighlight === "soft" ? "soft skills" : activeHighlight === "verbs" ? "action verbs" : "NLP-extracted skills"}
               </div>
+              )}
             </CardContent>
           </Card>
           )}

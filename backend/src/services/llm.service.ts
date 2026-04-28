@@ -10,19 +10,52 @@ import { RateLimitError } from "../middlewares/errorHandler";
 
 let genAI: GoogleGenerativeAI | null = null;
 
-function getModel() {
-  if (!env.GEMINI_API_KEY) return null;
+function getGoogleAI(): GoogleGenerativeAI | null {
+  if (!env.GEMINI_API_KEY?.trim()) return null;
   if (!genAI) genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
-  return genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    generationConfig: {
-      temperature: 0,
-    },
+  return genAI;
+}
+
+/** Log once per process if the key looks misconfigured (does not block calls). */
+let geminiKeyDiagnosticsLogged = false;
+function logGeminiKeyDiagnostics(): void {
+  if (geminiKeyDiagnosticsLogged) return;
+  geminiKeyDiagnosticsLogged = true;
+  const k = env.GEMINI_API_KEY?.trim() ?? "";
+  if (!k) {
+    console.warn("[LLM] GEMINI_API_KEY is empty — AI routes will use fallbacks or errors.");
+    return;
+  }
+  if (k.length < 30) {
+    console.warn("[LLM] GEMINI_API_KEY looks unusually short — verify it is a valid Google AI Studio key.");
+  } else if (!k.startsWith("AIza")) {
+    console.warn(
+      "[LLM] GEMINI_API_KEY does not start with \"AIza\" — if calls fail with 401, create a key at https://aistudio.google.com/apikey",
+    );
+  }
+}
+
+function getGenerativeModel(modelId: string) {
+  const client = getGoogleAI();
+  if (!client) return null;
+  return client.getGenerativeModel({
+    model: modelId,
+    generationConfig: { temperature: 0 },
   });
 }
 
+/** Plain-text prompts (resume scoring, chat, etc.) — `gemini-1.5-flash` by default */
+function getTextModel() {
+  return getGenerativeModel(env.GEMINI_TEXT_MODEL);
+}
+
+/** Multimodal PDF/DOCX bytes (OCR path when pdf-parse is weak) — separate env so you can tune independently */
+function getDocumentModel() {
+  return getGenerativeModel(env.GEMINI_DOC_MODEL);
+}
+
 export function isLlmAvailable(): boolean {
-  return !!env.GEMINI_API_KEY;
+  return !!env.GEMINI_API_KEY?.trim();
 }
 
 /** Sleep helper for retry */
@@ -35,14 +68,28 @@ function today() { return new Date().toLocaleDateString("en-US", { year: "numeri
  * Call Gemini with a prompt, parse JSON response, with retry on rate limit
  * (free / low QPS tiers often return 429 — backoff gives the API time to recover).
  */
-async function callGemini<T>(prompt: string, maxRetries = 3): Promise<T | null> {
-  const model = getModel();
+async function callGemini<T>(
+  prompt: string,
+  maxRetries = 3,
+  logContext?: string,
+): Promise<T | null> {
+  const model = getTextModel();
   if (!model) return null;
+
+  logGeminiKeyDiagnostics();
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const result = await model.generateContent(prompt);
       const text = result.response.text();
+
+      if (logContext) {
+        console.log(`[LLM:${logContext}] model=${env.GEMINI_TEXT_MODEL} raw response length (chars):`, text.length);
+        console.log(
+          `[LLM:${logContext}] Raw response before JSON parse (first 4000 chars):`,
+          text.slice(0, 4000),
+        );
+      }
 
       // Extract JSON from response (handle markdown code blocks)
       const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);
@@ -61,6 +108,20 @@ async function callGemini<T>(prompt: string, maxRetries = 3): Promise<T | null> 
         errMsg.toLowerCase().includes("quota") ||
         errMsg.toLowerCase().includes("rate limit");
       const isOverloaded = errMsg.includes("503") || errMsg.toLowerCase().includes("overloaded");
+      const isAuthKey =
+        /401|403|api key|API_KEY|permission|unauthorized|PERMISSION_DENIED|invalid/i.test(errMsg);
+
+      if (is429) {
+        console.error(
+          `[LLM] Quota / rate limit (429) on model=${env.GEMINI_TEXT_MODEL} — attempt ${attempt + 1}/${maxRetries + 1}:`,
+          errMsg.slice(0, 400),
+        );
+      } else if (isAuthKey) {
+        console.error(
+          `[LLM] API key or permission error on model=${env.GEMINI_TEXT_MODEL}:`,
+          errMsg.slice(0, 400),
+        );
+      }
 
       // Retry on rate limit (429) or temporary overload
       if ((is429 || isOverloaded) && attempt < maxRetries) {
@@ -74,11 +135,11 @@ async function callGemini<T>(prompt: string, maxRetries = 3): Promise<T | null> 
 
       // All retries exhausted on 429 → throw so the user gets a clear message
       if (is429) {
-        console.error(`[LLM] Rate limit persists after ${maxRetries + 1} attempts`);
+        console.error(`[LLM] Quota (429) persists after ${maxRetries + 1} attempts — check billing/quotas in Google AI Studio.`);
         throw new RateLimitError();
       }
 
-      console.error(`[LLM] Gemini API error (attempt ${attempt + 1}):`, errMsg.slice(0, 200));
+      console.error(`[LLM] Gemini API error (attempt ${attempt + 1}) model=${env.GEMINI_TEXT_MODEL}:`, errMsg.slice(0, 400));
       return null;
     }
   }
@@ -95,19 +156,27 @@ async function callGemini<T>(prompt: string, maxRetries = 3): Promise<T | null> 
  * This handles image-based/scanned PDFs that pdf-parse cannot read.
  */
 export async function extractTextWithGeminiVision(filePath: string): Promise<string> {
-  const model = getModel();
+  const model = getDocumentModel();
   if (!model) return "";
+
+  logGeminiKeyDiagnostics();
 
   const resolvedPath = path.resolve(filePath);
   if (!fs.existsSync(resolvedPath)) return "";
 
+  const ext = path.extname(resolvedPath).toLowerCase();
+  const mimeType =
+    ext === ".pdf"
+      ? "application/pdf"
+      : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
   try {
     const fileBuffer = fs.readFileSync(resolvedPath);
     const base64Data = fileBuffer.toString("base64");
-    const ext = path.extname(resolvedPath).toLowerCase();
-    const mimeType = ext === ".pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-    console.log(`[Gemini Vision] Extracting text from ${path.basename(resolvedPath)} (${(fileBuffer.length / 1024).toFixed(0)} KB)...`);
+    console.log(
+      `[Gemini Doc] Extracting text via model=${env.GEMINI_DOC_MODEL} from ${path.basename(resolvedPath)} (${(fileBuffer.length / 1024).toFixed(0)} KB)...`,
+    );
 
     const result = await model.generateContent([
       {
@@ -122,27 +191,42 @@ export async function extractTextWithGeminiVision(filePath: string): Promise<str
     ]);
 
     const text = result.response.text();
-    console.log(`[Gemini Vision] ✅ Extracted ${text.split(/\s+/).filter(Boolean).length} words`);
+    console.log(`[Gemini Doc] ✅ Extracted ${text.split(/\s+/).filter(Boolean).length} words`);
     return text;
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
+    const is429 =
+      errMsg.includes("429") ||
+      errMsg.toLowerCase().includes("resource exhausted") ||
+      errMsg.toLowerCase().includes("quota") ||
+      errMsg.toLowerCase().includes("rate limit");
+    const isAuth = /401|403|api key|API_KEY|permission|PERMISSION_DENIED|invalid/i.test(errMsg);
+
+    if (is429) {
+      console.error(`[Gemini Doc] Quota / rate limit (429) model=${env.GEMINI_DOC_MODEL}:`, errMsg.slice(0, 400));
+    } else if (isAuth) {
+      console.error(`[Gemini Doc] API key or permission error model=${env.GEMINI_DOC_MODEL}:`, errMsg.slice(0, 400));
+    }
 
     // Retry once on rate limit
-    if (errMsg.includes("429")) {
-      console.log("[Gemini Vision] Rate limited, waiting 15s...");
+    if (is429) {
+      console.log("[Gemini Doc] Rate limited — waiting 15s then one retry...");
       await sleep(15000);
       try {
         const fileBuffer = fs.readFileSync(resolvedPath);
         const base64Data = fileBuffer.toString("base64");
         const result = await model.generateContent([
-          { inlineData: { mimeType: "application/pdf", data: base64Data } },
+          { inlineData: { mimeType, data: base64Data } },
           { text: "Extract ALL text content from this resume. Return ONLY plain text, no commentary." },
         ]);
         return result.response.text();
-      } catch { /* fall through */ }
+      } catch (e2: unknown) {
+        const m2 = e2 instanceof Error ? e2.message : String(e2);
+        console.error("[Gemini Doc] Retry failed:", m2.slice(0, 400));
+      }
     }
 
-    console.error("[Gemini Vision] Failed:", errMsg.slice(0, 200));
+    console.error(`[Gemini Doc] Failed model=${env.GEMINI_DOC_MODEL}:`, errMsg.slice(0, 400));
     return "";
   }
 }
@@ -260,11 +344,11 @@ SUGGESTION ACCURACY RULES (CRITICAL — avoid false positives):
 - If you detect the section exists but could be improved, say "Enhance your Education section with..." instead of "Add an Education section".
 - The "suggestions" array must contain ONLY actionable improvements that are genuinely missing. Double-check each suggestion against the full resume text.`;
 
-  let result = await callGemini<LlmAnalysisResult>(prompt);
+  let result = await callGemini<LlmAnalysisResult>(prompt, 3, "resume-analyze");
   if (!isValidLlmScores(result)) {
     console.warn("[LLM] First analyze response missing or invalid scores — retrying once...");
     await sleep(800);
-    result = await callGemini<LlmAnalysisResult>(prompt);
+    result = await callGemini<LlmAnalysisResult>(prompt, 3, "resume-analyze-retry");
   }
   if (!isValidLlmScores(result)) {
     console.error("[LLM] Resume analysis JSON invalid after retry — will use rule-based fallback in caller");
