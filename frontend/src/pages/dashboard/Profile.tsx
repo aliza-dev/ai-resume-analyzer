@@ -15,7 +15,14 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { resumeApi } from "@/api/resume";
-import type { Resume } from "@/types";
+import type { Resume, UserRole } from "@/types";
+import { USER_ROLES } from "@/types";
+
+function displayUserRole(role: UserRole | string | undefined): string {
+  if (!role) return "Member";
+  const row = USER_ROLES.find((r) => r.value === role);
+  return row?.label ?? String(role).replace(/_/g, " ");
+}
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -42,7 +49,7 @@ export function ProfilePage() {
   const profileFields = [
     { icon: User, label: "Full Name", value: user?.name || "N/A", capitalize: true },
     { icon: Mail, label: "Email", value: (user?.email || "N/A").toLowerCase(), capitalize: false },
-    { icon: Shield, label: "Role", value: user?.role?.replace(/_/g, " ") || "N/A", capitalize: true },
+    { icon: Shield, label: "Role", value: displayUserRole(user?.role), capitalize: false },
     {
       icon: Calendar,
       label: "Member Since",
@@ -88,8 +95,8 @@ export function ProfilePage() {
                 <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                   {(user?.email || "").toLowerCase()}
                 </p>
-                <Badge className="mt-3 capitalize">
-                  {user?.role?.replace(/_/g, " ") || "Member"}
+                <Badge className="mt-3">
+                  {displayUserRole(user?.role)}
                 </Badge>
               </CardContent>
             </Card>

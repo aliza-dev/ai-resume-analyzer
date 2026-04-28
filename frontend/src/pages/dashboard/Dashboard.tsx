@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   FileText,
@@ -24,7 +24,7 @@ import { SkillsRadarChart } from "@/components/charts/SkillsRadarChart";
 import { useAuth } from "@/hooks/useAuth";
 import { resumeApi } from "@/api/resume";
 import type { Resume } from "@/types";
-import { getScoreLabel } from "@/utils/constants";
+import { getDashboardListBarColor, getScoreLabel } from "@/utils/constants";
 import { SkeletonDashboard } from "@/components/ui/skeleton";
 
 function AnimatedCounter({ value, duration = 1.5 }: { value: number; duration?: number }) {
@@ -71,6 +71,14 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
+/** Latest activity wins so re-analyzed resumes surface ahead of newer uploads with stale scores. */
+function resumeRecencyMs(r: Resume): number {
+  const analysisT = r.analysis?.updatedAt ? new Date(r.analysis.updatedAt).getTime() : 0;
+  const resumeT = r.updatedAt ? new Date(r.updatedAt).getTime() : 0;
+  const created = new Date(r.createdAt).getTime();
+  return Math.max(analysisT, resumeT, created);
+}
+
 export function DashboardPage() {
   const { user } = useAuth();
   const [resumes, setResumes] = useState<Resume[]>([]);
@@ -91,7 +99,11 @@ export function DashboardPage() {
   }, []);
 
   const safeResumes = Array.isArray(resumes) ? resumes : [];
-  const latestResume = safeResumes[0];
+  const sortedResumes = useMemo(
+    () => [...safeResumes].sort((a, b) => resumeRecencyMs(b) - resumeRecencyMs(a)),
+    [safeResumes],
+  );
+  const latestResume = sortedResumes[0];
   const analysis = latestResume?.analysis;
   const averageScore =
     safeResumes.length > 0
@@ -115,7 +127,7 @@ export function DashboardPage() {
       iconColor: "text-blue-500",
     },
     {
-      label: "Average Score",
+      label: "Overall Average",
       value: averageScore,
       suffix: "%",
       icon: TrendingUp,
@@ -205,19 +217,26 @@ export function DashboardPage() {
                       {stat.suffix}
                     </p>
                   ) : stat.label === "Job Match" ? (
-                    /* Glowing CTA for empty Job Match */
-                    <Link to="/job-match">
-                      <motion.button
-                        className="mt-1 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-purple-500/25 transition-all hover:shadow-xl hover:shadow-purple-500/40 hover:brightness-110"
-                        animate={{ boxShadow: ["0 0 15px rgba(168,85,247,0.25)", "0 0 25px rgba(168,85,247,0.45)", "0 0 15px rgba(168,85,247,0.25)"] }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    /* Valid <a> only — no nested <button> (breaks navigation / HTML) */
+                    <motion.span
+                      className="mt-1 inline-block"
+                      animate={{
+                        boxShadow: [
+                          "0 0 15px rgba(168,85,247,0.25)",
+                          "0 0 25px rgba(168,85,247,0.45)",
+                          "0 0 15px rgba(168,85,247,0.25)",
+                        ],
+                      }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      <Link
+                        to="/job-match"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-purple-500/25 transition-all hover:shadow-xl hover:shadow-purple-500/40 hover:brightness-110"
                       >
-                        <span className="flex items-center gap-1.5">
-                          <Target className="h-3 w-3" />
-                          Optimize for a Role
-                        </span>
-                      </motion.button>
-                    </Link>
+                        <Target className="h-3 w-3" />
+                        Optimize for a Role
+                      </Link>
+                    </motion.span>
                   ) : (
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">N/A</p>
                   )}
@@ -229,7 +248,7 @@ export function DashboardPage() {
       </div>
 
       {/* Charts */}
-      {latestResume?.atsScore ? (
+      {latestResume != null && latestResume.atsScore != null && latestResume.atsScore > 0 ? (
         <div className="grid min-w-0 gap-6 lg:grid-cols-2">
           <motion.div variants={itemVariants} className="min-w-0">
             <AtsScoreChart score={latestResume.atsScore} />
@@ -289,7 +308,7 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {safeResumes.slice(0, 5).map((resume, i) => (
+                {sortedResumes.slice(0, 5).map((resume, i) => (
                   <motion.div
                     key={resume.id}
                     initial={{ opacity: 0, x: -20 }}
@@ -324,13 +343,14 @@ export function DashboardPage() {
                               value={resume.atsScore || 0}
                               className="w-24"
                               size="sm"
+                              barColor={getDashboardListBarColor(resume.atsScore || 0)}
                             />
                           </div>
                           <Badge
                             variant={
-                              (resume.atsScore || 0) >= 70
+                              (resume.atsScore || 0) >= 71
                                 ? "success"
-                                : (resume.atsScore || 0) >= 40
+                                : (resume.atsScore || 0) >= 41
                                   ? "warning"
                                   : "danger"
                             }

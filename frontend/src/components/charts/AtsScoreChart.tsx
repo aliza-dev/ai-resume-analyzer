@@ -1,10 +1,14 @@
 import { motion } from "framer-motion";
 import { getScoreColor, getScoreLabel } from "@/utils/constants";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-interface AtsScoreChartProps { score: number; }
+interface AtsScoreChartProps {
+  score: number;
+  /** Explains what the number represents (e.g. latest analyzed resume vs portfolio). */
+  caption?: string;
+}
 
-export function AtsScoreChart({ score }: AtsScoreChartProps) {
+export function AtsScoreChart({ score, caption = "Most recently analyzed resume" }: AtsScoreChartProps) {
   const color = getScoreColor(score);
   const label = getScoreLabel(score);
   const circumference = 2 * Math.PI * 80;
@@ -14,6 +18,7 @@ export function AtsScoreChart({ score }: AtsScoreChartProps) {
     <Card>
       <CardHeader>
         <CardTitle className="text-gradient">ATS Score</CardTitle>
+        <CardDescription className="text-xs">{caption}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center">

@@ -20,6 +20,9 @@ import {
   FileText,
   AlertTriangle,
   Lock,
+  Github,
+  Linkedin,
+  Twitter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -38,7 +41,7 @@ function Section({ children, className = "", id }: { children: React.ReactNode; 
       initial="hidden"
       whileInView="show"
       viewport={{ once: true, margin: "-80px" }}
-      className={className}
+      className={[className, id ? "scroll-mt-28 sm:scroll-mt-32" : ""].filter(Boolean).join(" ")}
     >
       {children}
     </motion.section>
@@ -459,9 +462,15 @@ export function HomePage() {
 
           {/* Center links — hidden on mobile */}
           <div className="hidden items-center gap-6 text-sm text-gray-400 md:flex">
-            <a href="#features" className="transition-colors hover:text-white">Features</a>
-            <a href="#how-it-works" className="transition-colors hover:text-white">How it Works</a>
-            <Link to="/pricing" className="transition-colors hover:text-white">Pricing</Link>
+            <a href="#features" className="transition-colors hover:text-white">
+              Features
+            </a>
+            <a href="#how-it-works" className="transition-colors hover:text-white">
+              How it Works
+            </a>
+            <a href="#pricing" className="transition-colors hover:text-white">
+              Pricing
+            </a>
           </div>
 
           {/* Auth buttons — clear Sign In + Sign Up */}
@@ -651,6 +660,62 @@ export function HomePage() {
         </div>
       </Section>
 
+      {/* ── PRICING (in-page anchor #pricing) ───────────────────── */}
+      <Section id="pricing" className="border-t border-white/[0.06] bg-white/[0.02] px-3 py-24 sm:px-4 md:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          <motion.div variants={fadeUp} custom={0} className="mb-12 text-center">
+            <span className="mb-3 inline-block rounded-full bg-indigo-500/10 px-4 py-1 text-xs font-semibold tracking-wider text-indigo-400">
+              PRICING
+            </span>
+            <h2 className="mt-3 text-3xl font-bold lg:text-5xl">
+              Start free,{" "}
+              <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                upgrade when you are ready
+              </span>
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-gray-300">
+              One free AI scan on signup. Pro unlocks unlimited analyses, mock interviews, job match, and more.
+            </p>
+          </motion.div>
+
+          <div className="mx-auto grid max-w-3xl gap-6 md:grid-cols-2">
+            <motion.div
+              variants={fadeUp}
+              custom={1}
+              className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8 text-left"
+            >
+              <p className="text-sm font-semibold text-gray-400">Basic</p>
+              <p className="mt-2 text-3xl font-extrabold text-white">Free</p>
+              <p className="mt-1 text-sm text-gray-500">Try core ATS scoring and suggestions.</p>
+              <Link to="/register" className="mt-6 block">
+                <Button variant="outline" className="w-full border-white/10 bg-white/5 text-gray-200 hover:bg-white/10">
+                  Start free
+                </Button>
+              </Link>
+            </motion.div>
+            <motion.div
+              variants={fadeUp}
+              custom={2}
+              className="relative rounded-2xl border-2 border-indigo-500/40 bg-gradient-to-b from-indigo-500/[0.12] to-white/[0.02] p-8 text-left shadow-lg shadow-indigo-500/15"
+            >
+              <span className="absolute -top-3 left-6 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-md">
+                Best value
+              </span>
+              <p className="mt-1 text-sm font-semibold text-indigo-300">Pro</p>
+              <p className="mt-2 text-3xl font-extrabold text-white">
+                $4.99<span className="text-base font-normal text-gray-500">/mo</span>
+              </p>
+              <p className="mt-1 text-sm text-gray-400">Full AI suite, unlimited scans, priority support.</p>
+              <Link to="/pricing" className="mt-6 block">
+                <Button className="w-full gap-2 shadow-lg shadow-indigo-500/25">
+                  View all plans <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </motion.div>
+          </div>
+        </div>
+      </Section>
+
       {/* ── FINAL CTA ────────────────────────────────────────────── */}
       <Section className="relative overflow-hidden px-3 py-24 sm:px-4 md:px-6 lg:px-8">
         <div className="pointer-events-none absolute inset-0">
@@ -686,16 +751,47 @@ export function HomePage() {
 
       {/* ── FOOTER ───────────────────────────────────────────────── */}
       <footer className="border-t border-white/[0.06] px-3 py-10 sm:px-4 md:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
-            <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row">
+          <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600">
-                <Brain className="h-4 w-4 text-white" />
+              <Brain className="h-4 w-4 text-white" />
             </div>
             <span className="text-lg font-bold">
               Resume<span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">AI</span>
             </span>
           </div>
-          <p className="text-sm text-gray-600">
+
+          <div className="flex items-center gap-4">
+            <a
+              href="https://twitter.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-white/[0.06] hover:text-white"
+              aria-label="Twitter"
+            >
+              <Twitter className="h-5 w-5" />
+            </a>
+            <a
+              href="https://www.linkedin.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-white/[0.06] hover:text-white"
+              aria-label="LinkedIn"
+            >
+              <Linkedin className="h-5 w-5" />
+            </a>
+            <a
+              href="https://github.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-white/[0.06] hover:text-white"
+              aria-label="GitHub"
+            >
+              <Github className="h-5 w-5" />
+            </a>
+          </div>
+
+          <p className="text-center text-sm text-gray-600 sm:text-right">
             © {new Date().getFullYear()} AI Resume Analyzer. All rights reserved.
           </p>
         </div>

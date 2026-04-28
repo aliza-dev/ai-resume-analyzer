@@ -62,6 +62,33 @@ const SKILL_COLORS = [
   "#a855f7", "#d946ef", "#f59e0b", "#10b981", "#0ea5e9",
 ];
 
+/** Matches backend `sectionMap` in `analysis.service.ts` `getResumePreview`. */
+const CANONICAL_SECTION_COLORS: Record<string, string> = {
+  summary: "#6366f1",
+  experience: "#22c55e",
+  skills: "#f59e0b",
+  education: "#3b82f6",
+  projects: "#ec4899",
+  certifications: "#8b5cf6",
+};
+
+/** Same hex values as the highlight pill toggles and `HighlightedText` marks. */
+const HIGHLIGHT_MODE_COLORS: Record<"tech" | "soft" | "verbs" | "dynamic", string> = {
+  tech: "#6366f1",
+  soft: "#22c55e",
+  verbs: "#f59e0b",
+  dynamic: "#ec4899",
+};
+
+function resolveSectionColor(name: string, serverFallback: string): string {
+  const key = name.trim().toLowerCase();
+  return CANONICAL_SECTION_COLORS[key] ?? serverFallback;
+}
+
+function countNonEmptyPreviewSections(sections: ResumePreview["sections"] | undefined): number {
+  return (sections ?? []).filter((s) => (s.content ?? "").trim().length > 0).length;
+}
+
 function HighlightedText({ text, keywords, color }: { text: string; keywords: string[]; color: string }) {
   if (!keywords.length) return <span>{text}</span>;
 
@@ -150,7 +177,10 @@ export function VisualizationsPage() {
       } else if (r.fileAvailable === false) {
         toast.success(`Loaded ${r.topSkills.length} skills from your stored analysis`, { id: "viz" });
       } else {
-        toast.success(`${r.wordCount} words parsed, ${r.sections.length} sections found!`, { id: "viz" });
+        toast.success(
+          `${r.wordCount} words parsed, ${countNonEmptyPreviewSections(r.sections)} sections found!`,
+          { id: "viz" },
+        );
       }
     } catch (err) {
       const e = err as { response?: { data?: { message?: string } } };
@@ -190,7 +220,7 @@ export function VisualizationsPage() {
     if (preview.needsAnalysis) return false;
     const noSkills = (preview.topSkills?.length ?? 0) === 0;
     const noText = !preview.fullText || preview.fullText.trim().length === 0;
-    const noSections = (preview.sections?.length ?? 0) === 0;
+    const noSections = countNonEmptyPreviewSections(preview.sections) === 0;
     const noHighlights =
       (preview.highlights?.techKeywords?.length ?? 0) === 0 &&
       (preview.highlights?.softSkills?.length ?? 0) === 0 &&
@@ -210,7 +240,35 @@ export function VisualizationsPage() {
     }
   }, [preview, activeHighlight]);
 
-  const highlightColor = activeHighlight === "tech" ? "#6366f1" : activeHighlight === "soft" ? "#22c55e" : activeHighlight === "verbs" ? "#f59e0b" : "#ec4899";
+  const displayedSections = useMemo(
+    () => (preview?.sections ?? []).filter((s) => (s.content ?? "").trim().length > 0),
+    [preview?.sections],
+  );
+
+  const topBarSkills = useMemo(() => {
+    const raw = preview?.topSkills ?? [];
+    return raw.slice(0, 10).map((t) => ({
+      skill: t.skill,
+      count: Math.max(0, Math.round(Number(t.count)) || 0),
+    }));
+  }, [preview?.topSkills]);
+
+  const barCountMax = useMemo(
+    () => Math.max(1, ...topBarSkills.map((d) => d.count)),
+    [topBarSkills],
+  );
+
+  const barXTicks = useMemo(() => {
+    const m = barCountMax;
+    if (m <= 10) return Array.from({ length: m + 1 }, (_, i) => i);
+    const step = Math.max(1, Math.ceil(m / 8));
+    const ticks: number[] = [0];
+    for (let v = step; v < m; v += step) ticks.push(v);
+    if (ticks[ticks.length - 1] !== m) ticks.push(m);
+    return ticks;
+  }, [barCountMax]);
+
+  const highlightColor = HIGHLIGHT_MODE_COLORS[activeHighlight];
 
   if (isLoading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" /></div>;
 
@@ -424,8 +482,16 @@ export function VisualizationsPage() {
               {preview.topSkills.length > 0 ? (
                 <div className="flex min-h-[260px] flex-wrap items-center justify-center gap-2 py-4">
                   {preview.topSkills.map((s, i) => {
-                    const maxCount = preview.topSkills[0]?.count || 1;
-                    const size = 0.75 + (s.count / maxCount) * 1.2; // 0.75rem to 1.95rem
+                    const n = Math.max(0, Math.round(Number(s.count)) || 0);
+                    const maxCount = Math.max(
+                      1,
+                      ...preview.topSkills.map((t) => Math.max(0, Math.round(Number(t.count)) || 0)),
+                    );
+                    const size = 0.75 + (n / maxCount) * 1.2; // 0.75rem to 1.95rem
+                    const tip =
+                      n === 1
+                        ? `${s.skill}: found 1 time in this resume`
+                        : `${s.skill}: found ${n} times in this resume`;
                     return (
                       <motion.span key={s.skill}
                         initial={{ opacity: 0, scale: 0 }}
@@ -437,7 +503,7 @@ export function VisualizationsPage() {
                           color: SKILL_COLORS[i % SKILL_COLORS.length],
                           backgroundColor: SKILL_COLORS[i % SKILL_COLORS.length] + "15",
                         }}
-                        title={`${s.skill}: ${s.count} mentions`}
+                        title={tip}
                       >
                         {s.skill}
                       </motion.span>
@@ -463,13 +529,20 @@ export function VisualizationsPage() {
                 {(preview.topSkills?.length ?? 0) > 0 ? (
                   <RechartsSafeContainer>
                     <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
-                      <BarChart data={preview.topSkills.slice(0, 10)} layout="vertical" barCategoryGap="15%">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 11 }} />
+                      <BarChart data={topBarSkills} layout="vertical" barCategoryGap="15%">
+                        <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.35} />
+                        <XAxis
+                          type="number"
+                          domain={[0, barCountMax]}
+                          ticks={barXTicks}
+                          allowDecimals={false}
+                          tickFormatter={(v) => String(Math.round(Number(v)))}
+                          tick={{ fill: "#9ca3af", fontSize: 11 }}
+                        />
                         <YAxis type="category" dataKey="skill" width={100} tick={{ fill: "#6b7280", fontSize: 11 }} />
                         <Tooltip contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff", fontSize: 12 }} />
                         <Bar dataKey="count" radius={[0, 6, 6, 0]} name="Mentions">
-                          {preview.topSkills.slice(0, 10).map((_, i) => (
+                          {topBarSkills.map((_, i) => (
                             <Cell key={i} fill={SKILL_COLORS[i % SKILL_COLORS.length]} />
                           ))}
                         </Bar>
@@ -500,7 +573,7 @@ export function VisualizationsPage() {
                   </div>
                   <div className="rounded-xl bg-green-50 p-3 text-center dark:bg-green-900/20">
                     <CheckCircle2 className="mx-auto mb-1 h-5 w-5 text-green-500" />
-                    <p className="text-2xl font-bold text-green-600">{preview.sections?.length || 0}</p>
+                    <p className="text-2xl font-bold text-green-600">{displayedSections.length}</p>
                     <p className="text-[10px] text-gray-500">Sections</p>
                   </div>
                   <div className="rounded-xl bg-purple-50 p-3 text-center dark:bg-purple-900/20">
@@ -542,11 +615,13 @@ export function VisualizationsPage() {
                 {/* Highlight toggles */}
                 <div className="flex flex-wrap gap-1.5">
                   {([
-                    { key: "tech" as const, label: "Tech Skills", color: "#6366f1", count: preview.highlights?.techKeywords?.length ?? 0, icon: Code2 },
-                    { key: "soft" as const, label: "Soft Skills", color: "#22c55e", count: preview.highlights?.softSkills?.length ?? 0, icon: Heart },
-                    { key: "verbs" as const, label: "Action Verbs", color: "#f59e0b", count: preview.highlights?.actionVerbs?.length ?? 0, icon: Zap },
-                    { key: "dynamic" as const, label: "NLP Detected", color: "#ec4899", count: preview.highlights?.dynamicSkills?.length ?? 0, icon: Sparkles },
-                  ]).map((h) => (
+                    { key: "tech" as const, label: "Tech Skills", count: preview.highlights?.techKeywords?.length ?? 0, icon: Code2 },
+                    { key: "soft" as const, label: "Soft Skills", count: preview.highlights?.softSkills?.length ?? 0, icon: Heart },
+                    { key: "verbs" as const, label: "Action Verbs", count: preview.highlights?.actionVerbs?.length ?? 0, icon: Zap },
+                    { key: "dynamic" as const, label: "NLP Detected", count: preview.highlights?.dynamicSkills?.length ?? 0, icon: Sparkles },
+                  ]).map((h) => {
+                    const color = HIGHLIGHT_MODE_COLORS[h.key];
+                    return (
                     <button key={h.key}
                       onClick={() => setActiveHighlight(h.key)}
                       className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all ${
@@ -554,46 +629,53 @@ export function VisualizationsPage() {
                           ? "shadow-md"
                           : "opacity-60 hover:opacity-100"}`}
                       style={{
-                        borderColor: activeHighlight === h.key ? h.color : "#d1d5db",
-                        backgroundColor: activeHighlight === h.key ? h.color + "15" : "transparent",
-                        color: h.color,
+                        borderColor: activeHighlight === h.key ? color : "#d1d5db",
+                        backgroundColor: activeHighlight === h.key ? color + "15" : "transparent",
+                        color,
                       }}>
                       <h.icon className="h-3 w-3" />
                       {h.label} ({h.count})
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               {/* Section tabs */}
-              {(preview.sections?.length ?? 0) > 0 && (
+              {displayedSections.length > 0 && (
                 <div className="mb-4 flex flex-wrap gap-2">
-                  {preview.sections.map((s) => (
-                    <span key={s.name} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: s.color }}>
-                      <BookOpen className="h-3 w-3" />
-                      {s.name}
-                    </span>
-                  ))}
+                  {displayedSections.map((s) => {
+                    const chipColor = resolveSectionColor(s.name, s.color);
+                    return (
+                      <span key={s.name} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: chipColor }}>
+                        <BookOpen className="h-3 w-3" />
+                        {s.name}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
 
               {/* Resume text with highlighted sections */}
-              <div className="max-h-[600px] space-y-4 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-5 font-mono text-xs leading-relaxed dark:border-gray-700 dark:bg-gray-900 scrollbar-thin">
-                {(preview.sections?.length ?? 0) > 0 ? (
-                  preview.sections.map((section) => (
+              <div className="viz-preview-scroll max-h-[600px] space-y-4 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-5 font-mono text-xs leading-relaxed dark:border-gray-700 dark:bg-gray-900">
+                {displayedSections.length > 0 ? (
+                  displayedSections.map((section) => {
+                    const sectionColor = resolveSectionColor(section.name, section.color);
+                    return (
                     <div key={section.name}>
                       {/* Section header */}
                       <div className="mb-2 flex items-center gap-2">
-                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: section.color }} />
-                        <span className="text-sm font-bold" style={{ color: section.color }}>{section.name}</span>
+                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: sectionColor }} />
+                        <span className="text-sm font-bold" style={{ color: sectionColor }}>{section.name}</span>
                       </div>
                       {/* Section content with keyword highlights */}
                       <div className="ml-5 whitespace-pre-wrap text-gray-700 dark:text-gray-300">
                         <HighlightedText text={section.content} keywords={highlightKeywords} color={highlightColor} />
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 ) : (
                   /* Fallback: show full text */
                   <div className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">

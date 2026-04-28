@@ -7,11 +7,13 @@ interface ProgressProps {
   className?: string;
   showLabel?: boolean;
   size?: "sm" | "md" | "lg";
+  /** When set, overrides `getScoreColor` (e.g. dashboard list tiers). */
+  barColor?: string;
 }
 
-export function Progress({ value, max = 100, className, showLabel = false, size = "md" }: ProgressProps) {
+export function Progress({ value, max = 100, className, showLabel = false, size = "md", barColor }: ProgressProps) {
   const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
-  const color = getScoreColor(percentage);
+  const color = barColor ?? getScoreColor(percentage);
 
   const heights = { sm: "h-1.5", md: "h-2.5", lg: "h-4" };
 

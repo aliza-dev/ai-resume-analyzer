@@ -178,11 +178,22 @@ export function PricingPage() {
           </Link>
         </motion.div>
 
-        <motion.div variants={fadeUp} initial="hidden" animate="show" custom={2}
-          className="relative flex flex-col rounded-2xl border-2 border-indigo-500/50 bg-gradient-to-b from-indigo-500/[0.08] to-transparent p-8 shadow-xl shadow-indigo-500/10">
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-            <span className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-1 text-xs font-bold text-white shadow-lg shadow-indigo-500/40">
-              MOST POPULAR
+        <motion.div variants={fadeUp} initial="hidden" animate="show" custom={2} className="relative">
+          <div className="pointer-events-none absolute -inset-3 rounded-3xl bg-gradient-to-b from-indigo-500/30 via-purple-500/15 to-transparent opacity-70 blur-2xl" />
+          <motion.div
+            className="relative z-10 flex flex-col rounded-2xl border-2 border-indigo-400/55 bg-gradient-to-b from-indigo-500/[0.12] to-transparent p-8 ring-1 ring-indigo-400/25"
+            animate={{
+              boxShadow: [
+                "0 25px 50px -12px rgba(99, 102, 241, 0.25), 0 0 0 1px rgba(129, 140, 248, 0.2)",
+                "0 25px 55px -10px rgba(139, 92, 246, 0.45), 0 0 42px -8px rgba(99, 102, 241, 0.35)",
+                "0 25px 50px -12px rgba(99, 102, 241, 0.25), 0 0 0 1px rgba(129, 140, 248, 0.2)",
+              ],
+            }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+          <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2">
+            <span className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-1 text-xs font-bold text-white shadow-lg shadow-indigo-500/50">
+              Best value
             </span>
           </div>
           <div className="mb-6">
@@ -208,6 +219,7 @@ export function PricingPage() {
               {isUpgrading ? "Redirecting to checkout..." : "Upgrade to Pro"} {!isUpgrading && <ArrowRight className="h-4 w-4" />}
             </Button>
           )}
+          </motion.div>
         </motion.div>
       </div>
     </div>

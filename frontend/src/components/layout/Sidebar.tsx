@@ -113,7 +113,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       cn(
                         "group relative flex items-center gap-3 border-l-[3px] py-2 pl-[9px] pr-3 text-[13px] font-medium transition-all duration-200",
                         isActive
-                          ? "border-l-indigo-600 bg-indigo-50 text-indigo-900 shadow-sm dark:border-l-indigo-400 dark:bg-white/10 dark:text-indigo-100"
+                          ? "border-l-indigo-600 bg-indigo-50 text-indigo-900 shadow-sm ring-1 ring-inset ring-indigo-200/80 dark:border-l-indigo-400 dark:bg-indigo-500/15 dark:text-white dark:ring-indigo-400/25"
                           : "border-l-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
                       )
                     }

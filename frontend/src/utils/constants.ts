@@ -38,3 +38,11 @@ export function getScoreLabel(score: number): string {
   if (score >= 40) return "Average";
   return "Needs Improvement";
 }
+
+/** Progress bar color for dashboard resume list (distinct from headline `getScoreColor` bands). */
+export function getDashboardListBarColor(score: number): string {
+  const s = Math.min(100, Math.max(0, Math.round(Number(score)) || 0));
+  if (s <= 40) return "#ef4444"; // red — needs improvement
+  if (s <= 70) return "#f59e0b"; // amber/orange — average
+  return "#22c55e"; // green — good / excellent
+}

@@ -33,6 +33,8 @@ export interface Resume {
   /** Canonical headline ATS % — use everywhere vs. derived “readiness” metrics */
   atsScore: number | null;
   createdAt: string;
+  /** Present when returned from API — used to pick “latest analyzed” resume for dashboard */
+  updatedAt?: string;
   analysis?: Analysis;
 }
 
@@ -49,6 +51,8 @@ export interface Analysis {
   /** Technical + dynamic keywords; may include `Soft:Label` entries from AI analysis */
   keywords: string[];
   missingKeywords: string[];
+  /** When returned from API — last analysis write time */
+  updatedAt?: string;
   metrics?: {
     grammarScore: number;
     impactScore: number;

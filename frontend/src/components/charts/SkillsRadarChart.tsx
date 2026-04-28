@@ -49,17 +49,19 @@ export function SkillsRadarChart({
   return (
     <Card className="border-gray-200/80 bg-white dark:border-gray-700 dark:bg-gray-900/40">
       <CardHeader>
-        <CardTitle>Resume section scores</CardTitle>
+        <CardTitle>Resume Section Analysis</CardTitle>
       </CardHeader>
       <CardContent>
         <RechartsSafeContainer empty={false}>
-          <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={220}>
-            <RadarChart cx="50%" cy="52%" outerRadius="72%" data={data}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={240}>
+            <RadarChart
+              cx="50%"
+              cy="51%"
+              outerRadius="62%"
+              margin={{ top: 28, right: 36, bottom: 28, left: 36 }}
+              data={data}
+            >
               <defs>
-                <linearGradient id="radarFill" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#818cf8" stopOpacity={0.55} />
-                  <stop offset="100%" stopColor="#c084fc" stopOpacity={0.35} />
-                </linearGradient>
                 <linearGradient id="radarStroke" x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0%" stopColor="#6366f1" />
                   <stop offset="100%" stopColor="#a855f7" />
@@ -67,13 +69,14 @@ export function SkillsRadarChart({
               </defs>
               <PolarGrid
                 stroke="#64748b"
-                strokeOpacity={0.35}
-                radialLines
+                strokeOpacity={0.3}
+                radialLines={false}
               />
               <PolarAngleAxis
                 dataKey="subject"
-                tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }}
+                tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 600 }}
                 tickLine={false}
+                tickMargin={14}
               />
               <PolarRadiusAxis
                 angle={30}
@@ -97,9 +100,9 @@ export function SkillsRadarChart({
                 name="Section score"
                 dataKey="score"
                 stroke="url(#radarStroke)"
-                fill="url(#radarFill)"
-                fillOpacity={0.85}
-                strokeWidth={2.5}
+                fill="rgba(99, 102, 241, 0.2)"
+                fillOpacity={1}
+                strokeWidth={2}
                 dot={{ r: 4, fill: "#a5b4fc", stroke: "#4f46e5", strokeWidth: 1 }}
                 activeDot={{ r: 6 }}
               />
