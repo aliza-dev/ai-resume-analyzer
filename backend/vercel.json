@@ -1,4 +1,12 @@
 {
   "version": 2,
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "functions": {
+    "src/server.ts": {
+      "maxDuration": 60
+    },
+    "dist/server.js": {
+      "maxDuration": 60
+    }
+  }
 }

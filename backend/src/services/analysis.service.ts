@@ -172,9 +172,101 @@ function normalizeResumeText(raw: string): string {
   return text;
 }
 
+type FileExt = ".pdf" | ".docx";
+
 /**
- * Extract text from PDF or DOCX with robust normalization
- * (exported for upload pipeline — persists text so analyze works when /tmp is gone, e.g. Vercel)
+ * Buffer-based extraction (no disk dependency). Use this from the upload pipeline
+ * where we already hold the bytes — avoids `/tmp` gotchas on Vercel completely.
+ *
+ * `pdfFallbackPath` is only consulted for the *Gemini Vision* fallback (the SDK reads
+ * a file path). When undefined and a Vision retry is needed, we write a temp file ourselves.
+ */
+export async function extractTextFromBuffer(
+  buffer: Buffer,
+  ext: FileExt,
+  fileLabel: string,
+  pdfFallbackPath?: string,
+): Promise<string> {
+  let rawText = "";
+  try {
+    if (ext === ".pdf") {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const pdfParse = require("pdf-parse");
+      const data = await pdfParse(buffer);
+      rawText = data.text || "";
+      const w = countWords(rawText);
+      console.log(
+        `[Parser] PDF ${fileLabel}: ${buffer.length} bytes → pdf-parse word count: ${w}` +
+          (w === 0
+            ? " (empty — may be image-only or protected)"
+            : ` — preview: ${(rawText || "").slice(0, 120).replace(/\s+/g, " ")}…`),
+      );
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mammoth = require("mammoth");
+      const result = await mammoth.extractRawText({ buffer });
+      rawText = result.value || "";
+      console.log(`[Parser] DOCX ${fileLabel}: ${buffer.length} bytes → mammoth word count: ${countWords(rawText)}`);
+    }
+  } catch (error) {
+    console.error(`[Parser] ${ext} parse error for ${fileLabel}:`, error instanceof Error ? error.message : error);
+    rawText = "";
+  }
+
+  // PDF + weak/empty result + we have an LLM key → try Gemini Vision (multimodal PDF read).
+  const needsVision =
+    ext === ".pdf" &&
+    isLlmAvailable() &&
+    (!rawText.trim() || countWords(rawText) < MIN_WORDS_TRY_GEMINI_AFTER_PDF);
+
+  if (needsVision) {
+    let visionPath = pdfFallbackPath;
+    let tempCreated = false;
+    try {
+      if (!visionPath || !fs.existsSync(visionPath)) {
+        const tmpDir = process.env.VERCEL ? "/tmp/uploads" : path.resolve("./uploads");
+        if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+        visionPath = path.join(
+          tmpDir,
+          `vision-${Date.now()}-${Math.round(Math.random() * 1e9)}.pdf`,
+        );
+        fs.writeFileSync(visionPath, buffer);
+        tempCreated = true;
+      }
+      console.log(
+        `[Parser] pdf-parse yielded ${countWords(rawText)} words — trying Gemini Vision OCR for: ${fileLabel}`,
+      );
+      const geminiText = await extractTextWithGeminiVision(visionPath);
+      if (geminiText.trim() && (!rawText.trim() || countWords(geminiText) > countWords(rawText))) {
+        rawText = geminiText;
+      }
+    } catch (err) {
+      console.error(`[Parser] Gemini Vision fallback errored for ${fileLabel}:`, err instanceof Error ? err.message : err);
+    } finally {
+      if (tempCreated && visionPath) {
+        try {
+          fs.unlinkSync(visionPath);
+        } catch {
+          /* best-effort cleanup */
+        }
+      }
+    }
+  }
+
+  if (!rawText.trim()) {
+    console.warn(`[Parser] No extractable text after pdf-parse + optional Gemini Vision for ${fileLabel}`);
+    return "";
+  }
+
+  const normalized = normalizeResumeText(rawText);
+  console.log(`[Parser] Extracted ${countWords(normalized)} words from ${fileLabel} (length ${normalized.length})`);
+  return normalized;
+}
+
+/**
+ * Extract text from PDF or DOCX with robust normalization.
+ * Reads from disk if the file is still there (local dev / same Vercel invocation).
+ * Returns `""` if the file is missing — callers fall back to `storedResumeText`.
  */
 export async function extractTextFromFile(filePath: string): Promise<string> {
   const resolvedPath = path.resolve(filePath);
@@ -184,67 +276,20 @@ export async function extractTextFromFile(filePath: string): Promise<string> {
     console.warn(`File not found: ${resolvedPath}`);
     return "";
   }
-
-  let rawText = "";
-
-  try {
-    if (ext === ".pdf") {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require("pdf-parse");
-      const buffer = fs.readFileSync(resolvedPath);
-      const data = await pdfParse(buffer);
-      rawText = data.text || "";
-      const w = countWords(rawText);
-      console.log(
-        `[Parser] PDF ${path.basename(resolvedPath)}: ${buffer.length} bytes → pdf-parse word count: ${w}` +
-        (w === 0 ? " (empty — may be image-only or protected)" : ` — preview: ${(rawText || "").slice(0, 120).replace(/\s+/g, " ")}…`),
-      );
-    } else if (ext === ".docx") {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mammoth = require("mammoth");
-      const result = await mammoth.extractRawText({ path: resolvedPath });
-      rawText = result.value || "";
-    }
-  } catch (error) {
-    console.error("Text extraction error:", error);
-    rawText = "";
-    // PDF: continue — we may recover via Gemini Vision below
-    if (ext !== ".pdf") {
-      return "";
-    }
-  }
-
-  // Weak or empty PDF text: try Gemini Vision (handles many scanned PDFs pdf-parse cannot read).
-  // Future option: add Tesseract.js or cloud OCR (Textract, Document AI) when API keys are absent.
-  const pdfNeedsVision =
-    ext === ".pdf" &&
-    isLlmAvailable() &&
-    (!rawText.trim() || countWords(rawText) < MIN_WORDS_TRY_GEMINI_AFTER_PDF);
-
-  if (pdfNeedsVision) {
-    console.log(
-      `[Parser] pdf-parse yielded ${countWords(rawText)} words — trying Gemini Vision OCR for: ${path.basename(resolvedPath)}`,
-    );
-    const geminiText = await extractTextWithGeminiVision(resolvedPath);
-    if (geminiText.trim() && (!rawText.trim() || countWords(geminiText) > countWords(rawText))) {
-      rawText = geminiText;
-    }
-  }
-
-  if (!rawText.trim()) {
-    console.warn(
-      `[Parser] No extractable text after pdf-parse + optional Gemini Vision: ${path.basename(resolvedPath)} (path exists: true)`,
-    );
+  if (ext !== ".pdf" && ext !== ".docx") {
+    console.warn(`Unsupported file extension: ${ext} (${resolvedPath})`);
     return "";
   }
 
-  // Apply normalization pipeline
-  const normalized = normalizeResumeText(rawText);
+  let buffer: Buffer;
+  try {
+    buffer = fs.readFileSync(resolvedPath);
+  } catch (err) {
+    console.error(`[Parser] Could not read file at ${resolvedPath}:`, err instanceof Error ? err.message : err);
+    return "";
+  }
 
-  console.log(`[Parser] Extracted ${normalized.split(/\s+/).length} words from ${path.basename(resolvedPath)}`);
-  console.log("[Parser] Extracted Text Length:", normalized.length);
-
-  return normalized;
+  return extractTextFromBuffer(buffer, ext, path.basename(resolvedPath), resolvedPath);
 }
 
 // ══════════════════════════════════════════════════════════════════

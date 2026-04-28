@@ -1,7 +1,22 @@
 import prisma from "../config/database";
 import fs from "fs";
 import path from "path";
-import { extractTextFromFile } from "./analysis.service";
+import { extractTextFromBuffer } from "./analysis.service";
+
+type SupportedExt = ".pdf" | ".docx";
+
+function detectExt(file: Express.Multer.File): SupportedExt | null {
+  const e = path.extname(file.originalname).toLowerCase();
+  if (e === ".pdf" || e === ".docx") return e;
+  if (file.mimetype === "application/pdf") return ".pdf";
+  if (
+    file.mimetype ===
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    return ".docx";
+  }
+  return null;
+}
 
 export class ResumeService {
   async upload(userId: string, file: Express.Multer.File) {
@@ -16,23 +31,44 @@ export class ResumeService {
       },
     });
 
-    // Persist extracted text immediately so analyze/preview work when the file path
-    // points to ephemeral storage (e.g. Vercel `/tmp` — a different invocation often has no file).
+    // ── Persist extracted text now, while the bytes are still in this serverless invocation.
+    // On Vercel, `/tmp` is *not* shared between invocations — so a later /analyze call
+    // would not see the file at all. Caching the text here makes /analyze deterministic.
     try {
-      const extracted = await extractTextFromFile(file.path);
-      if (extracted.trim()) {
-        await prisma.resume.update({
-          where: { id: resume.id },
-          data: { storedResumeText: extracted.slice(0, 500_000) },
-        });
-        const refreshed = await prisma.resume.findFirst({
-          where: { id: resume.id, userId },
-          include: { analysis: true },
-        });
-        if (refreshed) return refreshed;
+      const ext = detectExt(file);
+      if (!ext) {
+        console.warn("[Resume upload] Unsupported extension/mime:", file.originalname, file.mimetype);
+      } else {
+        let buffer: Buffer | null = null;
+        if (file.buffer && file.buffer.length > 0) {
+          buffer = file.buffer;
+        } else if (file.path && fs.existsSync(file.path)) {
+          buffer = fs.readFileSync(file.path);
+        }
+
+        if (!buffer) {
+          console.error("[Resume upload] No buffer or readable file path — cannot pre-extract text");
+        } else {
+          const extracted = await extractTextFromBuffer(buffer, ext, file.originalname, file.path);
+          if (extracted.trim()) {
+            await prisma.resume.update({
+              where: { id: resume.id },
+              data: { storedResumeText: extracted.slice(0, 500_000) },
+            });
+            const refreshed = await prisma.resume.findFirst({
+              where: { id: resume.id, userId },
+              include: { analysis: true },
+            });
+            if (refreshed) return refreshed;
+          } else {
+            console.warn(
+              `[Resume upload] Extraction yielded 0 words for ${file.originalname} — analyze will likely fail until user uploads a text-based PDF/DOCX.`,
+            );
+          }
+        }
       }
     } catch (err) {
-      console.error("[Resume upload] Text extraction failed (non-fatal):", err);
+      console.error("[Resume upload] Pre-extraction failed (non-fatal):", err);
     }
 
     return resume;
@@ -70,14 +106,13 @@ export class ResumeService {
       throw new Error("Resume not found");
     }
 
-    // Delete file from disk
     try {
       const filePath = path.resolve(resume.fileUrl);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     } catch {
-      // File might already be deleted
+      /* file may already be gone (e.g. /tmp wiped) */
     }
 
     await prisma.resume.delete({
