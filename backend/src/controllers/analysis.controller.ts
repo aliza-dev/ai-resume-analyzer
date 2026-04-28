@@ -1,9 +1,72 @@
 import type { Response, NextFunction } from "express";
+import * as cheerio from "cheerio";
 import { analysisService } from "../services/analysis.service";
 import { analyzeSchema, jobMatchSchema } from "../validators/analysis";
 import { sendSuccess, sendError } from "../helpers/response";
 import { deductCredit } from "../middlewares/credits";
 import type { AuthenticatedRequest } from "../types";
+
+const JOB_FETCH_TIMEOUT_MS = 12_000;
+const JOB_FETCH_UA = "Mozilla/5.0 (compatible; ResumeAI/1.0)";
+
+/** Fetch HTML for job URL scraping (native fetch — reliable on Vercel serverless vs dynamic axios import). */
+async function fetchJobPageHtml(
+  jobUrl: string
+): Promise<{ ok: true; html: string } | { ok: false; message: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), JOB_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(jobUrl, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: {
+        "User-Agent": JOB_FETCH_UA,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    });
+
+    if (res.status === 404) {
+      return {
+        ok: false,
+        message:
+          "That job URL returned 404 (not found). Check the link or paste the job description manually.",
+      };
+    }
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: `The page returned HTTP ${res.status}. It may block automated access — paste the job description manually.`,
+      };
+    }
+
+    const html = await res.text();
+    if (!html.trim()) {
+      return {
+        ok: false,
+        message: "The page returned no usable HTML. Paste the job description manually.",
+      };
+    }
+    return { ok: true, html };
+  } catch (err) {
+    const isAbort =
+      err instanceof Error &&
+      (err.name === "AbortError" || /abort/i.test(err.message));
+    if (isAbort) {
+      return {
+        ok: false,
+        message:
+          "Fetching the job URL timed out. Try again, or paste the job description manually.",
+      };
+    }
+    return {
+      ok: false,
+      message:
+        "Could not fetch the job URL (network error). The page may be private or blocking scrapers. Paste the job description manually.",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 /** Send result + deduct 1 AI credit, include remaining balance in response header */
 async function sendWithCredit(res: Response, userId: string, data: unknown) {
@@ -288,9 +351,24 @@ export class AnalysisController {
   async chat(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       if (!req.user) { sendError(res, "Unauthorized", 401); return; }
-      const { resumeId, question } = req.body;
+      const { resumeId, question, history } = req.body;
       if (!resumeId || !question) { sendError(res, "resumeId and question required", 400); return; }
-      const result = await analysisService.chat(resumeId, req.user.userId, question);
+      const sanitizedHistory = Array.isArray(history)
+        ? history
+            .slice(-24)
+            .filter(
+              (h: unknown) =>
+                h &&
+                typeof h === "object" &&
+                (h as { role?: string }).role &&
+                typeof (h as { content?: string }).content === "string"
+            )
+            .map((h: { role: string; content: string }) => ({
+              role: (h.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+              content: String(h.content).slice(0, 4000),
+            }))
+        : undefined;
+      const result = await analysisService.chat(resumeId, req.user.userId, question, sanitizedHistory);
       await sendWithCredit(res, req.user.userId, result);
     } catch (error) { if (error instanceof Error && error.message === "Resume not found") { sendError(res, error.message, 404); return; } next(error); }
   }
@@ -340,25 +418,16 @@ export class AnalysisController {
         return;
       }
 
-      // 1. Scrape the job page
-      // @ts-expect-error dynamic import
-      const axios = (await import("axios")).default;
-      const cheerio = await import("cheerio");
-
-      let jobText: string;
-      try {
-        const { data: html } = await axios.get(jobUrl, {
-          timeout: 10000,
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; ResumeAI/1.0)" },
-        });
-        const $ = cheerio.load(html);
-        // Remove non-content elements
-        $("script, style, nav, header, footer, iframe, noscript, svg, img").remove();
-        jobText = $("body").text().replace(/\s+/g, " ").trim();
-      } catch {
-        sendError(res, "Could not fetch the job URL. The page may be private or blocking scrapers. Try pasting the job description manually.", 400);
+      // 1. Scrape the job page (fetch + cheerio; no axios — avoids missing-module issues on Vercel)
+      const fetched = await fetchJobPageHtml(jobUrl);
+      if (!fetched.ok) {
+        sendError(res, fetched.message, 400);
         return;
       }
+
+      const $ = cheerio.load(fetched.html);
+      $("script, style, nav, header, footer, iframe, noscript, svg, img").remove();
+      const jobText = $("body").text().replace(/\s+/g, " ").trim();
 
       if (jobText.length < 50) {
         sendError(res, "Could not extract enough text from that URL. The page may require login. Try pasting the job description manually.", 400);
@@ -393,10 +462,7 @@ export class AnalysisController {
       const { resumeId, jobDescription } = req.body;
       if (!resumeId || !jobDescription) { sendError(res, "resumeId and jobDescription are required", 400); return; }
 
-      const resumeText = await analysisService.getResumeText(resumeId, req.user.userId);
-
-      const { llmInterviewPredictor } = await import("../services/llm.service");
-      const result = await llmInterviewPredictor(resumeText, jobDescription);
+      const result = await analysisService.interviewPredictor(resumeId, req.user.userId, jobDescription);
 
       if (!result?.questions?.length) {
         sendError(res, "AI failed to generate questions. Please try again.", 500);

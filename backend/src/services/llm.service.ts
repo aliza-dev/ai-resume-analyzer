@@ -209,6 +209,10 @@ Before adding ANY skill to "missing_keywords":
 3. If the skill OR any synonym appears ANYWHERE — in Skills, Experience, Projects, Certifications, Summary, or even a project description — it MUST go in "matched_keywords", NOT "missing_keywords".
 4. If you are unsure, put it in "matched_keywords". False negatives are a critical bug.
 
+STEP 0.3 — SOFT SKILLS & INTERPERSONAL STRENGTHS (MANDATORY):
+Scan the FULL resume for clearly stated professional/soft skills (examples: leadership, communication, teamwork, collaboration, mentoring, stakeholder management, cross-functional work, problem solving, presentation skills, conflict resolution, coaching, negotiation, time management, adaptability, initiative, interpersonal skills, client-facing experience).
+For EVERY soft skill you can quote or paraphrase from the text with confidence, add ONE entry to "matched_keywords" using this exact format: "Soft:Leadership" (prefix "Soft:" + short Title Case label). Use at least 3 when the resume clearly contains multiple; use zero only if the resume truly mentions none. Do NOT invent soft skills.
+
 === END HIGHEST PRIORITY ===
 
 RESUME (${wordCount} words):
@@ -226,7 +230,7 @@ MULTI-DIMENSIONAL METRICS (all 0-100):
 - keyword_score: density of relevant industry keywords and technologies. Compare to what's expected for the candidate's apparent field.
 
 STRICT SCORING RULES — you MUST follow these:
-1. matched_keywords = real skills/technologies explicitly written IN the resume (use semantic matching from Step 0.2)
+1. matched_keywords = real skills/technologies explicitly written IN the resume (use semantic matching from Step 0.2) PLUS soft-skill entries from Step 0.3 using the "Soft:Label" format
 2. missing_keywords = important skills relevant to the candidate's field that are NOT in the resume (ONLY after full verification)
 3. suggestions = specific, actionable improvements for THIS resume (not generic advice)
 
@@ -406,10 +410,21 @@ export interface LlmInterviewQuestion {
   tip: string;
 }
 
-export async function llmInterviewQuestions(resumeText: string): Promise<{ questions: LlmInterviewQuestion[] } | null> {
+export async function llmInterviewQuestions(
+  resumeText: string,
+  accountDisplayName?: string
+): Promise<{ questions: LlmInterviewQuestion[] } | null> {
+  const nameBlock =
+    accountDisplayName?.trim()
+      ? `REGISTERED CANDIDATE NAME (use ONLY this name when addressing or referring to the person — NEVER the resume filename, PDF title, or header text like "Aliza CV"):
+"${accountDisplayName.trim()}"
+`
+      : "";
+
   const prompt = `You are a senior technical interviewer conducting a focused mock interview.
 Today's date is ${today()}.
 
+${nameBlock}
 Based on this resume, generate hyper-personalized interview questions that reference the candidate's EXACT bullet points, project names, and technologies.
 
 RESUME:
@@ -443,7 +458,8 @@ CONCISENESS RULES (CRITICAL):
 - GOOD: "Walk me through the ML pipeline architecture you built at Company X."
 - Put any extra scenario details, hints, or answer structure guidance into the "tip" field ONLY.
 - The "tip" field should be 2-3 sentences max — suggest WHAT to cover and HOW to structure the answer (e.g., STAR method, specific metrics to mention).
-- All questions must reference SPECIFIC details from THIS resume (project names, company names, tech stack).`;
+- All questions must reference SPECIFIC details from THIS resume (project names, company names, tech stack).
+- Never address the candidate using the resume file name or a line that looks like a document title (e.g. "Aliza CV.pdf").`;
 
   const result = await callGemini<{ questions: unknown[] }>(prompt);
   if (!result?.questions) return null;
@@ -503,8 +519,26 @@ Find 5-10 weak bullet points. For each one:
   return callGemini<{ score: number; feedback: LlmFeedbackItem[] }>(prompt);
 }
 
+export type ChatHistoryTurn = { role: "user" | "assistant"; content: string };
+
 // ─── AI Chat ─────────────────────────────────────────────────────
-export async function llmChat(resumeText: string, analysisContext: string, question: string): Promise<{ answer: string } | null> {
+export async function llmChat(
+  resumeText: string,
+  analysisContext: string,
+  question: string,
+  history?: ChatHistoryTurn[]
+): Promise<{ answer: string } | null> {
+  const historyBlock =
+    history && history.length > 0
+      ? `CONVERSATION SO FAR (chronological — use this for follow-ups like "explain point 2" or "elaborate on that"):
+${history
+  .slice(-24)
+  .map((h) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content.slice(0, 1800)}`)
+  .join("\n")}
+
+`
+      : "";
+
   const prompt = `You are an expert ATS evaluator and friendly AI resume assistant.
 Today's date is ${today()}.
 
@@ -518,7 +552,10 @@ ${resumeText.slice(0, 3000)}
 ANALYSIS CONTEXT:
 ${analysisContext}
 
-USER'S QUESTION: "${question}"
+${historyBlock}USER'S CURRENT QUESTION: "${question}"
+
+SESSION MEMORY:
+- If CONVERSATION SO FAR is present, treat it as authoritative context. Answer follow-ups (e.g. "explain point 2", "what did you mean by…") by referring back to your prior numbered lists or claims in those turns.
 
 CRITICAL CONSISTENCY RULES — you MUST follow these:
 1. NEVER contradict yourself. If the analysis shows flaws, acknowledge them — do NOT praise a high score while also listing major problems.
@@ -535,7 +572,7 @@ SEMANTIC SKILL DETECTION (CRITICAL — avoid false negatives):
 - Only say a skill is "missing" if there is ABSOLUTELY NO mention of it or any synonym/abbreviation/variation anywhere in the resume.
 - If in doubt, say "I didn't find an explicit mention of X — consider adding it" rather than "X is missing from your resume."
 
-Answer helpfully and specifically. You may use **bold** for emphasis (wrapping key terms in double asterisks). Keep your response concise (under 200 words). If suggesting improvements, give specific before/after examples with actionable rewrites.
+Answer helpfully and specifically. You may use **bold** for emphasis (wrapping key terms in double asterisks). Keep your response concise (under 200 words when there is no prior conversation; if CONVERSATION SO FAR is present, you may use up to ~280 words to explain follow-ups clearly). If suggesting improvements, give specific before/after examples with actionable rewrites.
 
 FORMATTING RULES FOR BEFORE/AFTER EXAMPLES:
 - Do NOT use markdown bullet points combined with quotes (e.g., * "some text").
@@ -554,13 +591,35 @@ Return ONLY a JSON object:
 export async function llmGenerateContent(
   resumeText: string,
   jobDescription: string,
-  type: "cover_letter" | "linkedin_summary" | "professional_bio"
+  type: "cover_letter" | "linkedin_summary" | "professional_bio",
+  accountDisplayName?: string
 ): Promise<{ type: string; content: string } | null> {
   const typeLabels = {
     cover_letter: "a professional cover letter (3-4 paragraphs)",
-    linkedin_summary: "a LinkedIn About/Summary section (150-200 words, use emojis like 🚀💡📩 for visual appeal)",
+    linkedin_summary:
+      "a LinkedIn About/Summary section (150-220 words): opening hook, then scan-friendly bullets with professional emojis",
     professional_bio: "a short professional bio (80-100 words, third person)",
   };
+
+  const linkedinFormatRules =
+    type === "linkedin_summary"
+      ? `
+LINKEDIN SUMMARY LAYOUT (MANDATORY):
+- Use exactly 2-3 tasteful professional emojis total across the whole summary (e.g. 💼 🚀 📊 ✨ 🤝 📩) — do not spam emojis.
+- After a short opening paragraph (1-2 sentences), use line breaks and 3-5 bullet lines. Each bullet MUST start with the character "• " (bullet + space) for LinkedIn readability.
+- Keep bullets concise (one line each where possible). End with an optional short CTA line.
+- Do NOT use markdown **bold**, # headers, or numbered markdown lists.
+`
+      : "";
+
+  const professionalBioNameRules =
+    type === "professional_bio" && accountDisplayName?.trim()
+      ? `
+PROFESSIONAL BIO — NAME (MANDATORY):
+- The subject of the bio MUST be "${accountDisplayName.trim()}" (third person: "${accountDisplayName.trim()} is…").
+- Do NOT use the resume filename, PDF name, or header text (e.g. "Aliza CV") as the person's name under any circumstance.
+`
+      : "";
 
   const coverLetterRules = type === "cover_letter" ? `
 COVER LETTER SIGN-OFF (MANDATORY):
@@ -570,7 +629,8 @@ COVER LETTER SIGN-OFF (MANDATORY):
   Sincerely,
 
   John Smith
-- Do NOT end abruptly after the last paragraph. The sign-off is required.` : "";
+- Do NOT end abruptly after the last paragraph. The sign-off is required.
+- NEVER use a resume filename, PDF title, or phrases like "Aliza CV", "John Resume", or "Curriculum Vitae" as the sign-off name — those are NOT human names.` : "";
 
   const prompt = `CRITICAL: You are a TRUTHFUL assistant. You MUST follow the anti-hallucination rules below before writing ANYTHING.
 
@@ -585,6 +645,11 @@ COVER LETTER SIGN-OFF (MANDATORY):
 You are a professional content writer specializing in career documents.
 Today's date is ${today()}.
 
+${accountDisplayName?.trim()
+    ? `REGISTERED USER NAME (use this EXACT string after "Sincerely," / "Best regards," — overrides the first line of the resume if it looks like a filename or document title):
+"${accountDisplayName.trim()}"
+`
+    : ""}
 Based on this resume and job description, write ${typeLabels[type]}.
 
 RESUME:
@@ -603,19 +668,21 @@ Return ONLY a JSON object:
 CRITICAL NAME EXTRACTION RULES:
 - The candidate's name is the HUMAN PERSON's name, usually the FIRST line of the resume.
 - Do NOT confuse University names, Company names, or Institution names with the candidate's name.
-- Examples of WRONG names: "University of California", "Massachusetts Institute", "Google LLC", "National Institute of Technology".
+- Examples of WRONG names: "University of California", "Massachusetts Institute", "Google LLC", "National Institute of Technology", filenames like "Jane_Doe_Resume.pdf", or headers like "Aliza CV" / "Resume — Software Engineer".
 - The candidate's name is typically 2-3 words like "John Smith" or "Priya Sharma" — NOT an organization.
+- If a REGISTERED USER NAME is provided above, use it for signatures, first-person identity, AND the subject of a professional bio — never substitute the resume's first line if it looks like a filename.
 - If you cannot confidently identify the candidate's real name, use "the candidate" instead.
 
 PLAIN TEXT FORMATTING (CRITICAL):
-- The "content" field MUST be PLAIN TEXT only — no markdown, no asterisks, no bold syntax.
+- The "content" field MUST be plain text — no markdown **bold**, # headers, or __underline__.
 - NEVER use **bold**, *italic*, __underline__, or any other markdown formatting.
 - BAD: "Skilled in **Python**, **React**, and **AWS**"
 - GOOD: "Skilled in Python, React, and AWS"
 - The output will be displayed in a text area and copied directly into LinkedIn, email, or Word — markdown asterisks look broken in those contexts.
 - For emphasis, use CAPITALIZATION sparingly or rephrase the sentence instead.
-- Emojis (like 🚀 💡 📩) are allowed ONLY for LinkedIn summaries.
-${coverLetterRules}
+- For LinkedIn summaries ONLY: emojis and "• " bullet lines are required as described above (still no ** markdown).
+- For cover letters and professional bios: no markdown; emojis only if type is LinkedIn summary.
+${professionalBioNameRules}${linkedinFormatRules}${coverLetterRules}
 Make it professional, personalized, and compelling. Reference ONLY specific skills that are explicitly listed in the RESUME — never from the JD alone.`;
 
   let result = await callGemini<{ type: string; content: string }>(prompt);
@@ -700,9 +767,21 @@ export interface LlmPredictedQuestion {
   strategy: string;
 }
 
-export async function llmInterviewPredictor(resumeText: string, jobDescription: string): Promise<{ questions: LlmPredictedQuestion[] } | null> {
+export async function llmInterviewPredictor(
+  resumeText: string,
+  jobDescription: string,
+  accountDisplayName?: string
+): Promise<{ questions: LlmPredictedQuestion[] } | null> {
+  const nameBlock =
+    accountDisplayName?.trim()
+      ? `REGISTERED CANDIDATE NAME (when referring to the candidate by name, use ONLY this — never the resume filename or title line):
+"${accountDisplayName.trim()}"
+`
+      : "";
+
   const prompt = `Act as an expert technical recruiter. Based on the candidate's resume and the provided job description, generate the top 5 most likely interview questions they will be asked.
 
+${nameBlock}
 RESUME:
 """
 ${resumeText.slice(0, 3000)}
@@ -726,17 +805,32 @@ Rules:
 - Questions must be SPECIFIC to both the resume content AND the job requirements
 - Include a mix: 2 technical, 1 behavioral, 1 experience-based, 1 situational
 - Keep questions concise (1-2 sentences max)
-- Strategies should reference actual resume details (project names, technologies)`;
+- Strategies should reference actual resume details (project names, technologies)
+- Do not use the resume file name or document-style headers as the candidate's name.`;
 
   return callGemini<{ questions: LlmPredictedQuestion[] }>(prompt);
 }
 
 // ─── Answer Evaluator ────────────────────────────────────────────
+export type LlmAnswerEvaluation = {
+  scoreOutOf10: number;
+  grade: string;
+  strengths: string[];
+  feedback: string[];
+  starFeedback: string;
+  techMentioned: string[];
+};
+
 export async function llmEvaluateAnswer(
   question: string,
   answer: string,
-  resumeContext: string
-): Promise<{ score: number; grade: string; strengths: string[]; feedback: string[]; techMentioned: string[] } | null> {
+  resumeContext: string,
+  accountDisplayName?: string
+): Promise<LlmAnswerEvaluation | null> {
+  const nameLine = accountDisplayName?.trim()
+    ? `The candidate's name is "${accountDisplayName.trim()}" — do not refer to them using a resume filename or document title.`
+    : "";
+
   const prompt = `You are a senior technical interviewer evaluating a candidate's answer.
 Today's date is ${today()}.
 
@@ -750,18 +844,55 @@ ${answer}
 RESUME CONTEXT (for reference):
 ${resumeContext.slice(0, 1500)}
 
+${nameLine}
+
 Evaluate the answer and return this EXACT JSON:
 {
-  "score": <number 0-100>,
+  "scoreOutOf10": <integer from 1 to 10 only — 10 is an excellent, structured interview answer>,
   "grade": "<Excellent|Good|Average|Needs Improvement>",
   "strengths": [<2-3 things the candidate did well>],
-  "feedback": [<2-3 specific improvements needed>],
-  "techMentioned": [<technologies/concepts the candidate mentioned>]
+  "feedback": [<2-4 specific improvements — be concrete>],
+  "starFeedback": "<one cohesive paragraph (4-8 sentences) that: (1) briefly rates how well their answer covers Situation, Task, Action, and Result; (2) names which STAR parts are weak or missing; (3) gives actionable rewrite guidance using STAR; (4) does NOT invent resume facts>",
+  "techMentioned": [<technologies/concepts the candidate mentioned in the answer>]
 }
 
-Evaluate based on: STAR method usage, specificity, technical depth, confidence, and relevance.`;
+Rules:
+- scoreOutOf10 MUST be an integer 1-10 (this is the primary score).
+- starFeedback MUST explicitly reference STAR (Situation, Task, Action, Result) and tell them how to improve.
+- feedback items should complement starFeedback with bite-sized tips.`;
 
-  return callGemini<{ score: number; grade: string; strengths: string[]; feedback: string[]; techMentioned: string[] }>(prompt);
+  const raw = await callGemini<{
+    scoreOutOf10?: number;
+    score?: number;
+    grade: string;
+    strengths: string[];
+    feedback: string[];
+    starFeedback?: string;
+    techMentioned: string[];
+  }>(prompt);
+
+  if (!raw) return null;
+
+  let scoreOutOf10 = typeof raw.scoreOutOf10 === "number" ? Math.round(raw.scoreOutOf10) : NaN;
+  if (Number.isNaN(scoreOutOf10) && typeof raw.score === "number") {
+    scoreOutOf10 = Math.min(10, Math.max(1, Math.round(raw.score / 10)));
+  }
+  if (Number.isNaN(scoreOutOf10)) scoreOutOf10 = 5;
+  scoreOutOf10 = Math.min(10, Math.max(1, scoreOutOf10));
+
+  const starFeedback =
+    typeof raw.starFeedback === "string" && raw.starFeedback.trim().length > 0
+      ? raw.starFeedback.trim()
+      : "Review your answer using STAR: clarify the Situation, your Task, specific Actions you took, and measurable Results.";
+
+  return {
+    scoreOutOf10,
+    grade: raw.grade || "Average",
+    strengths: Array.isArray(raw.strengths) ? raw.strengths : [],
+    feedback: Array.isArray(raw.feedback) ? raw.feedback : [],
+    starFeedback,
+    techMentioned: Array.isArray(raw.techMentioned) ? raw.techMentioned : [],
+  };
 }
 
 // ─── Complexity-Aware Project Suggestions ─────────────────────────

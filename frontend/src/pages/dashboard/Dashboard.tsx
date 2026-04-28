@@ -240,6 +240,7 @@ export function DashboardPage() {
               experience={analysis?.experienceScore || 0}
               education={analysis?.educationScore || 0}
               projects={analysis?.projectsScore || 0}
+              headlineAts={latestResume.atsScore ?? null}
             />
           </motion.div>
         </div>

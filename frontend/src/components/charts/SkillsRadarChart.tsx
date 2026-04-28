@@ -5,15 +5,24 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   ResponsiveContainer,
+  Tooltip,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RechartsSafeContainer } from "@/components/charts/RechartsSafeContainer";
+
+function clampScore(v: unknown): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
 
 interface SkillsRadarChartProps {
   skills: number;
   experience: number;
   education: number;
   projects: number;
+  /** Headline ATS from `resume.atsScore` — fifth axis so the chart aligns with the main score card */
+  headlineAts?: number | null;
 }
 
 export function SkillsRadarChart({
@@ -21,42 +30,78 @@ export function SkillsRadarChart({
   experience,
   education,
   projects,
+  headlineAts,
 }: SkillsRadarChartProps) {
+  const s = clampScore(skills);
+  const e = clampScore(experience);
+  const ed = clampScore(education);
+  const p = clampScore(projects);
+  const ats = headlineAts != null && headlineAts !== undefined ? clampScore(headlineAts) : null;
+
   const data = [
-    { subject: "Skills", score: skills, fullMark: 100 },
-    { subject: "Experience", score: experience, fullMark: 100 },
-    { subject: "Education", score: education, fullMark: 100 },
-    { subject: "Projects", score: projects, fullMark: 100 },
+    { subject: "Skills", score: s, fullMark: 100 },
+    { subject: "Experience", score: e, fullMark: 100 },
+    { subject: "Education", score: ed, fullMark: 100 },
+    { subject: "Projects", score: p, fullMark: 100 },
+    ...(ats != null && ats > 0 ? [{ subject: "ATS (overall)", score: ats, fullMark: 100 }] : []),
   ];
 
-  const hasData = data.some((d) => d.score > 0);
-
   return (
-    <Card>
+    <Card className="border-gray-200/80 bg-white dark:border-gray-700 dark:bg-gray-900/40">
       <CardHeader>
-        <CardTitle>Resume Section Analysis</CardTitle>
+        <CardTitle>Resume section scores</CardTitle>
       </CardHeader>
       <CardContent>
-        <RechartsSafeContainer empty={!hasData} emptyMessage="No section scores yet — run analysis to see this chart.">
-          <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
-            <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
-              <PolarGrid stroke="#e5e7eb" />
+        <RechartsSafeContainer empty={false}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={220}>
+            <RadarChart cx="50%" cy="52%" outerRadius="72%" data={data}>
+              <defs>
+                <linearGradient id="radarFill" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#818cf8" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="#c084fc" stopOpacity={0.35} />
+                </linearGradient>
+                <linearGradient id="radarStroke" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#6366f1" />
+                  <stop offset="100%" stopColor="#a855f7" />
+                </linearGradient>
+              </defs>
+              <PolarGrid
+                stroke="#64748b"
+                strokeOpacity={0.35}
+                radialLines
+              />
               <PolarAngleAxis
                 dataKey="subject"
-                tick={{ fill: "#6b7280", fontSize: 12 }}
+                tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }}
+                tickLine={false}
               />
               <PolarRadiusAxis
-                angle={90}
+                angle={30}
                 domain={[0, 100]}
-                tick={{ fill: "#9ca3af", fontSize: 10 }}
+                tickCount={5}
+                tick={{ fill: "#64748b", fontSize: 9 }}
+                axisLine={false}
+              />
+              <Tooltip
+                formatter={(value: number) => [`${value}%`, "Score"]}
+                contentStyle={{
+                  background: "rgba(15, 23, 42, 0.92)",
+                  border: "1px solid rgba(148, 163, 184, 0.35)",
+                  borderRadius: 10,
+                  fontSize: 12,
+                  color: "#e2e8f0",
+                }}
+                labelStyle={{ color: "#cbd5e1", fontWeight: 600 }}
               />
               <Radar
-                name="Score"
+                name="Section score"
                 dataKey="score"
-                stroke="#6366f1"
-                fill="#6366f1"
-                fillOpacity={0.3}
-                strokeWidth={2}
+                stroke="url(#radarStroke)"
+                fill="url(#radarFill)"
+                fillOpacity={0.85}
+                strokeWidth={2.5}
+                dot={{ r: 4, fill: "#a5b4fc", stroke: "#4f46e5", strokeWidth: 1 }}
+                activeDot={{ r: 6 }}
               />
             </RadarChart>
           </ResponsiveContainer>

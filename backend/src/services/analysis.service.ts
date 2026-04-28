@@ -7,6 +7,7 @@ import {
   llmAnalyzeResume,
   llmJobMatch,
   llmInterviewQuestions,
+  llmInterviewPredictor,
   llmSmartFeedback,
   llmChat,
   llmGenerateContent,
@@ -15,6 +16,7 @@ import {
   llmCareerGrowth,
   extractTextWithGeminiVision,
 } from "./llm.service";
+import type { ChatHistoryTurn } from "./llm.service";
 
 /**
  * Detect failed / glitched analysis suitable for discarding in favor of
@@ -339,7 +341,52 @@ class AnalysisEngine {
     "detail-oriented", "self-motivated", "strategic", "innovative",
     "negotiation", "presentation", "stakeholder management", "decision making",
     "conflict resolution", "coaching", "cross-functional", "multitasking",
+    "interpersonal", "empathy", "emotional intelligence", "active listening",
+    "written communication", "verbal communication", "public speaking", "facilitation",
+    "delegation", "accountability", "reliability", "dependability", "initiative",
+    "work ethic", "organizational skills", "prioritization", "customer service",
+    "client-facing", "relationship building", "influence", "persuasion",
+    "agile mindset", "growth mindset", "resilience", "cultural awareness",
+    "diversity and inclusion", "inclusivity", "team player", "people management",
   ];
+
+  /** Common resume phrases → canonical soft-skill labels (deduped with dictionary matches). */
+  private static readonly SOFT_SKILL_PHRASES: { pattern: RegExp; label: string }[] = [
+    { pattern: /\bteam\s+player\b/i, label: "Teamwork" },
+    { pattern: /\bpeople\s+manager\b/i, label: "People management" },
+    { pattern: /\bstrong\s+(written|verbal)\s+communication\b/i, label: "Communication" },
+    { pattern: /\bexcellent\s+communicator\b/i, label: "Communication" },
+    { pattern: /\binterpersonal\s+skills?\b/i, label: "Interpersonal" },
+    { pattern: /\bwork\s+closely\s+with\b/i, label: "Collaboration" },
+    { pattern: /\bcross[-\s]?functional\b/i, label: "Cross-functional" },
+    { pattern: /\bstakeholder(s)?\b/i, label: "Stakeholder management" },
+    { pattern: /\bled\s+(a\s+)?team\b/i, label: "Leadership" },
+    { pattern: /\bmentor(ed|ing)?\b/i, label: "Mentoring" },
+    { pattern: /\bclient[-\s]?facing\b/i, label: "Client-facing" },
+    { pattern: /\bproblem[-\s]?solver\b/i, label: "Problem solving" },
+    { pattern: /\bself[-\s]?starter\b/i, label: "Initiative" },
+    { pattern: /\bfast[-\s]?paced\b.*\b(environment|team)\b/i, label: "Adaptability" },
+  ];
+
+  /** Collect soft-skill labels from dictionary + phrase heuristics (stable order). */
+  static findSoftSkillsInText(raw: string): string[] {
+    const lower = raw.toLowerCase();
+    const found = new Set<string>();
+    for (const kw of AnalysisEngine.SOFT_SKILLS) {
+      if (AnalysisEngine.matchKeyword(lower, kw)) {
+        found.add(
+          kw
+            .split(/[\s-]+/)
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(kw.includes("-") ? "-" : " ")
+        );
+      }
+    }
+    for (const { pattern, label } of AnalysisEngine.SOFT_SKILL_PHRASES) {
+      if (pattern.test(raw)) found.add(label);
+    }
+    return Array.from(found);
+  }
 
   static readonly ACTION_VERBS = [
     "developed", "implemented", "designed", "built", "created", "optimized",
@@ -428,9 +475,7 @@ class AnalysisEngine {
       AnalysisEngine.matchKeyword(lowerText, kw)
     );
 
-    const foundSoftSkills = AnalysisEngine.SOFT_SKILLS.filter((kw) =>
-      AnalysisEngine.matchKeyword(lowerText, kw)
-    );
+    const foundSoftSkills = AnalysisEngine.findSoftSkillsInText(text);
 
     const foundActionVerbs = AnalysisEngine.ACTION_VERBS.filter((v) =>
       AnalysisEngine.matchKeyword(lowerText, v)
@@ -1704,7 +1749,15 @@ class AnalysisEngine {
   }
 
   // ─── Mock Interview Answer Evaluator ───
-  static evaluateAnswer(question: string, answer: string, resumeKeywords: string[]) {
+  static evaluateAnswer(question: string, answer: string, resumeKeywords: string[]): {
+    score: number;
+    scoreOutOf10: number;
+    grade: string;
+    strengths: string[];
+    feedback: string[];
+    techMentioned: string[];
+    starFeedback: string;
+  } {
     const lower = answer.toLowerCase();
     const words = answer.split(/\s+/).length;
 
@@ -1743,8 +1796,19 @@ class AnalysisEngine {
 
     score = Math.max(0, Math.min(100, score));
     const grade = score >= 85 ? "Excellent" : score >= 70 ? "Good" : score >= 50 ? "Average" : "Needs Improvement";
+    const scoreOutOf10 = Math.max(1, Math.min(10, Math.round(score / 10)));
+    const starParts: string[] = [];
+    if (hasSituation && hasAction && hasResult) {
+      starParts.push("Your answer maps reasonably well to Situation, Action, and Result.");
+    } else {
+      if (!hasSituation) starParts.push("Strengthen the Situation: briefly set context (team, timeline, constraint).");
+      if (!hasAction) starParts.push("Clarify the Action: what you personally did, with verbs and scope.");
+      if (!hasResult) starParts.push("Add the Result: quantify impact (%, time, revenue, users) where possible.");
+    }
+    starParts.push("Use STAR end-to-end: one clear example per question, then tie the Result back to what the interviewer cares about.");
+    const starFeedback = starParts.join(" ");
 
-    return { score, grade, strengths, feedback, techMentioned };
+    return { score, scoreOutOf10, grade, strengths, feedback, techMentioned, starFeedback };
   }
 
   // ─── AI Chat: Answer resume questions ───
@@ -1792,7 +1856,8 @@ class AnalysisEngine {
   static generateContent(
     resumeText: string,
     jobDescription: string,
-    type: "cover_letter" | "linkedin_summary" | "professional_bio"
+    type: "cover_letter" | "linkedin_summary" | "professional_bio",
+    accountName?: string
   ) {
     const lower = resumeText.toLowerCase();
 
@@ -1800,17 +1865,23 @@ class AnalysisEngine {
     // Strategy: check each line starting from the top; skip lines containing org keywords
     const ORG_NOISE = /\b(university|college|institute|school|academy|corporation|inc\b|ltd\b|llc\b|company|department|faculty|center|centre|foundation|technologies|solutions)\b/i;
     const nameLines = resumeText.split("\n").slice(0, 8); // only check first 8 lines
+    const trimmedAccount = accountName?.trim();
     let name = "the candidate";
-    for (const line of nameLines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.length > 60) continue; // skip empty or very long lines
-      if (ORG_NOISE.test(trimmed)) continue;           // skip org/university names
-      if (/[@.\/:]/.test(trimmed)) continue;            // skip emails, URLs, phone lines
-      if (/^\d/.test(trimmed)) continue;                // skip lines starting with numbers
-      const personMatch = trimmed.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})$/);
-      if (personMatch) {
-        name = personMatch[1];
-        break;
+    if (trimmedAccount && trimmedAccount.length >= 2 && trimmedAccount.length <= 120) {
+      name = trimmedAccount;
+    } else {
+      for (const line of nameLines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.length > 60) continue; // skip empty or very long lines
+        if (ORG_NOISE.test(trimmed)) continue;           // skip org/university names
+        if (/\b(cv|resume|curriculum vitae)\b/i.test(trimmed)) continue; // skip document titles, not people
+        if (/[@.\/:]/.test(trimmed)) continue;            // skip emails, URLs, phone lines
+        if (/^\d/.test(trimmed)) continue;                // skip lines starting with numbers
+        const personMatch = trimmed.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})$/);
+        if (personMatch) {
+          name = personMatch[1];
+          break;
+        }
       }
     }
 
@@ -2041,6 +2112,15 @@ export class AnalysisService {
       ];
     }
 
+    // Enrich keywords with NLP-detected soft skills (Soft:Label) for visualizations / preview fallbacks
+    const nlpSoft = AnalysisEngine.findSoftSkillsInText(resumeText);
+    for (const s of nlpSoft) {
+      const tagged = `Soft:${s}`;
+      if (!keywords.some((k) => k.toLowerCase() === tagged.toLowerCase())) {
+        keywords.push(tagged);
+      }
+    }
+
     // Persist extracted/normalized text for preview & visualizations when the file
     // is no longer on disk (Vercel /tmp). Capped to stay within Mongo document limits.
     const MAX_STORED_TEXT = 500_000;
@@ -2160,8 +2240,13 @@ export class AnalysisService {
   }
 
   async generateInterviewQuestions(resumeId: string, userId: string) {
-    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
+    const [resume, userRow] = await Promise.all([
+      prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } }),
+      prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    ]);
     if (!resume) throw new Error("Resume not found");
+
+    const accountName = userRow?.name?.trim() || undefined;
 
     let resumeText = await extractTextFromFile(resume.fileUrl);
 
@@ -2169,13 +2254,14 @@ export class AnalysisService {
     const storedKeywords = resume.analysis?.keywords || [];
     if ((!resumeText.trim() || resumeText.split(/\s+/).length < 20) && storedKeywords.length > 0) {
       console.log("[Interview] Using stored analysis keywords as context");
-      resumeText = `Resume for ${resume.fileName}. Skills: ${storedKeywords.join(", ")}. Role: ${resume.fileName.replace(/\.[^.]+$/, "")}.`;
+      const who = accountName || resume.fileName.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+      resumeText = `Candidate: ${who}. Resume file: ${resume.fileName}. Skills: ${storedKeywords.join(", ")}.`;
     }
 
     // ── Try LLM first ──
     if (isLlmAvailable() && resumeText.split(/\s+/).length > 10) {
       console.log("[Interview] Using Gemini AI...");
-      const llmResult = await llmInterviewQuestions(resumeText);
+      const llmResult = await llmInterviewQuestions(resumeText, accountName);
       if (llmResult && llmResult.questions.length > 0) {
         console.log(`[Interview] ✅ LLM generated ${llmResult.questions.length} questions`);
         return { totalQuestions: llmResult.questions.length, questions: llmResult.questions };
@@ -2291,23 +2377,30 @@ export class AnalysisService {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
 
-    // ── Try to extract text from the actual file ──
-    // On Vercel, /tmp is ephemeral so files uploaded in a previous invocation are gone.
-    let text = "";
+    const wordCountOf = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+    const MAX_TEXT = 500_000;
+    const stored = (resume.storedResumeText ?? "").trim();
+
+    // Prefer readable file text when strong; otherwise use DB text from last analysis
+    // (fixes Vercel /tmp loss so highlights + soft skills still work without the PDF).
+    let fileText = "";
     try {
-      text = await extractTextFromFile(resume.fileUrl);
+      fileText = (await extractTextFromFile(resume.fileUrl)).trim();
     } catch (err) {
       console.warn("[Preview] File extraction failed:", err);
     }
 
-    const wordCountOf = (s: string) => s.split(/\s+/).filter(Boolean).length;
-    // Fall back to text stored at last analysis (same content we scored) for preview/Quick Stats
-    if (wordCountOf(text) < 20 && resume.storedResumeText) {
-      const st = resume.storedResumeText.trim();
-      if (st.length > 0 && wordCountOf(st) >= 20) {
-        text = st;
-        console.log(`[Preview] Using stored resume text from DB for ${resume.fileName} (${wordCountOf(text)} words)`);
-      }
+    let text = "";
+    let usedStoredResumeText = false;
+    if (wordCountOf(fileText) >= 20) {
+      text = fileText.slice(0, MAX_TEXT);
+    } else if (wordCountOf(stored) >= 20) {
+      text = stored.slice(0, MAX_TEXT);
+      usedStoredResumeText = true;
+      console.log(`[Preview] Using stored resume text from DB for ${resume.fileName} (${wordCountOf(text)} words)`);
+    } else {
+      text = (fileText || stored).slice(0, MAX_TEXT);
+      usedStoredResumeText = wordCountOf(stored) > wordCountOf(fileText) && stored.length > 0;
     }
 
     const fileTextOk = text.trim().length > 0 && wordCountOf(text) >= 20;
@@ -2326,7 +2419,7 @@ export class AnalysisService {
 
     // Find tech keywords for highlighting (using word-boundary matching)
     const techFound = AnalysisEngine.TECH_KEYWORDS.filter((k) => AnalysisEngine.matchKeyword(lower, k));
-    const softFound = AnalysisEngine.SOFT_SKILLS.filter((k) => AnalysisEngine.matchKeyword(lower, k));
+    const softFound = AnalysisEngine.findSoftSkillsInText(text);
     const verbsFound = AnalysisEngine.ACTION_VERBS.filter((v) => AnalysisEngine.matchKeyword(lower, v));
 
     // Build section map with content
@@ -2384,6 +2477,7 @@ export class AnalysisService {
       topSkills,
       industryClassification: nlp.industryClassification,
       fileAvailable: true,
+      usedStoredResumeText,
     };
   }
 
@@ -2406,7 +2500,7 @@ export class AnalysisService {
     const storedKeywords = rawStoredKeywords.filter((k) => {
       if (typeof k !== "string") return false;
       const trimmed = k.trim();
-      if (trimmed.length === 0 || trimmed.length > 40) return false;
+      if (trimmed.length === 0 || trimmed.length > 56) return false;
       if (/[()[\]{}<>]/.test(trimmed)) return false;
       if (JUNK_PATTERNS.test(trimmed)) return false;
       return true;
@@ -2429,7 +2523,14 @@ export class AnalysisService {
     // Match stored keywords against our known dictionaries to populate highlights
     const lowerKw = storedKeywords.map((k) => k.toLowerCase());
     const techFound = AnalysisEngine.TECH_KEYWORDS.filter((k) => lowerKw.includes(k.toLowerCase()));
-    const softFound = AnalysisEngine.SOFT_SKILLS.filter((k) => lowerKw.includes(k.toLowerCase()));
+    const softFromLlm = storedKeywords
+      .filter((k) => /^soft:/i.test(k.trim()))
+      .map((k) => k.replace(/^soft:\s*/i, "").trim())
+      .filter((k) => k.length > 1 && k.length < 80);
+    const softFromDict = AnalysisEngine.SOFT_SKILLS.filter((k) => lowerKw.includes(k.toLowerCase()));
+    const softFound = [...new Set([...softFromLlm, ...softFromDict.map((k) =>
+      k.split(/[\s-]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(k.includes("-") ? "-" : " ")
+    )])];
     // We can't reconstruct action verbs without the text, so leave empty
     const verbsFound: string[] = [];
 
@@ -2437,7 +2538,10 @@ export class AnalysisService {
     const knownTechLower = new Set(AnalysisEngine.TECH_KEYWORDS.map((k) => k.toLowerCase()));
     const knownSoftLower = new Set(AnalysisEngine.SOFT_SKILLS.map((k) => k.toLowerCase()));
     const dynamicSkills = storedKeywords.filter(
-      (k) => !knownTechLower.has(k.toLowerCase()) && !knownSoftLower.has(k.toLowerCase())
+      (k) =>
+        !/^soft:/i.test(k.trim()) &&
+        !knownTechLower.has(k.toLowerCase()) &&
+        !knownSoftLower.has(k.toLowerCase())
     );
 
     // topSkills: synthesize descending counts so the bar chart still has visual weight order
@@ -2458,7 +2562,7 @@ export class AnalysisService {
     const sectionSummary = {
       name: "Recovered from last analysis",
       content:
-        "The original file is not on the server, and no stored resume text is saved yet. Re-run “Analyze” on a text-based PDF to store full text for previews. Below are skills recovered from your stored keyword analysis.",
+        "The original PDF is not on this server anymore (common on cloud hosting). Re-run Analyze Resume on a text-based PDF so we can save the extracted text to the database — then previews and AI highlights work without the file. Below are skills recovered from your stored keyword analysis.",
       color: "#6366f1",
     } as { name: string; content: string; color: string };
 
@@ -2628,20 +2732,47 @@ export class AnalysisService {
   }
 
   async evaluateAnswer(resumeId: string, userId: string, question: string, answer: string) {
-    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
+    const [resume, userRow] = await Promise.all([
+      prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } }),
+      prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    ]);
     if (!resume) throw new Error("Resume not found");
+    const accountName = userRow?.name?.trim() || undefined;
 
     if (isLlmAvailable()) {
       const resumeText = await this._getResumeTextWithFallback(resume);
-      const llmResult = await llmEvaluateAnswer(question, answer, resumeText);
-      if (llmResult) return llmResult;
+      const llmResult = await llmEvaluateAnswer(question, answer, resumeText, accountName);
+      if (llmResult) {
+        return {
+          score: llmResult.scoreOutOf10 * 10,
+          scoreOutOf10: llmResult.scoreOutOf10,
+          grade: llmResult.grade,
+          strengths: llmResult.strengths,
+          feedback: llmResult.feedback,
+          techMentioned: llmResult.techMentioned,
+          starFeedback: llmResult.starFeedback,
+        };
+      }
     }
 
     const keywords = resume.analysis?.keywords || [];
     return AnalysisEngine.evaluateAnswer(question, answer, keywords);
   }
 
-  async chat(resumeId: string, userId: string, question: string) {
+  async interviewPredictor(resumeId: string, userId: string, jobDescription: string) {
+    const resumeText = await this.getResumeText(resumeId, userId);
+    const userRow = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const accountName = userRow?.name?.trim() || undefined;
+    const result = await llmInterviewPredictor(resumeText, jobDescription, accountName);
+    return result;
+  }
+
+  async chat(
+    resumeId: string,
+    userId: string,
+    question: string,
+    history?: ChatHistoryTurn[]
+  ) {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
     const resumeText = await this._getResumeTextWithFallback(resume);
@@ -2651,7 +2782,7 @@ export class AnalysisService {
       const context = resume.analysis
         ? `ATS Score: ${resume.atsScore}%, Skills: ${resume.analysis.skillsScore}%, Experience: ${resume.analysis.experienceScore}%, Keywords: ${resume.analysis.keywords.join(", ")}, Missing: ${resume.analysis.missingKeywords.join(", ")}`
         : "No analysis data yet";
-      const llmResult = await llmChat(resumeText, context, question);
+      const llmResult = await llmChat(resumeText, context, question, history);
       if (llmResult) return llmResult;
     }
 
@@ -2669,17 +2800,21 @@ export class AnalysisService {
   }
 
   async generateContent(resumeId: string, userId: string, jobDescription: string, type: "cover_letter" | "linkedin_summary" | "professional_bio") {
-    const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
+    const [resume, userRow] = await Promise.all([
+      prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } }),
+      prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    ]);
     if (!resume) throw new Error("Resume not found");
     const resumeText = await this._getResumeTextWithFallback(resume);
+    const accountName = userRow?.name?.trim() || undefined;
 
     if (isLlmAvailable() && resumeText.split(/\s+/).length > 10) {
       console.log(`[Content] Using Gemini AI for ${type}...`);
-      const llmResult = await llmGenerateContent(resumeText, jobDescription, type);
+      const llmResult = await llmGenerateContent(resumeText, jobDescription, type, accountName);
       if (llmResult) return llmResult;
     }
 
-    return AnalysisEngine.generateContent(resumeText, jobDescription, type);
+    return AnalysisEngine.generateContent(resumeText, jobDescription, type, accountName);
   }
 
   async compareResumes(oldResumeId: string, newResumeId: string, userId: string) {

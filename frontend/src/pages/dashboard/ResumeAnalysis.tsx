@@ -456,7 +456,9 @@ export function ResumeAnalysisPage() {
   const sectionSum = analysis
     ? analysis.skillsScore + analysis.experienceScore + analysis.educationScore + analysis.projectsScore
     : 0;
-  const atsValue = resume?.atsScore ?? 0;
+  /** Single source of truth for headline ATS — same value as Compare page & resume list */
+  const canonicalAts = Math.max(0, Math.min(100, Math.round(Number(resume?.atsScore ?? 0))));
+  const atsValue = canonicalAts;
   const isAnalysisDegenerate =
     !!analysis && (sectionSum <= 5 || (atsValue < 5 && sectionSum < 30));
 
@@ -542,11 +544,11 @@ export function ResumeAnalysisPage() {
             {/* Charts Row — min-w-0 prevents grid/flex from collapsing chart width to 0 */}
             <div className="grid min-w-0 gap-6 lg:grid-cols-3">
               <motion.div variants={itemVariants} className="min-w-0">
-                <AtsScoreChart score={resume?.atsScore || 0} />
+                <AtsScoreChart score={canonicalAts} />
               </motion.div>
               <motion.div variants={itemVariants} className="min-w-0">
                 <StrengthMeter
-                  score={resume?.atsScore || 0}
+                  score={canonicalAts}
                   skillsScore={analysis.skillsScore}
                   experienceScore={analysis.experienceScore}
                   educationScore={analysis.educationScore}
@@ -559,6 +561,7 @@ export function ResumeAnalysisPage() {
                   experience={analysis.experienceScore}
                   education={analysis.educationScore}
                   projects={analysis.projectsScore}
+                  headlineAts={canonicalAts}
                 />
               </motion.div>
             </div>
@@ -605,17 +608,20 @@ export function ResumeAnalysisPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <CheckCircle2 className="h-5 w-5 text-green-500" />
-                      Keywords Found ({analysis.keywords.filter(k => !k.startsWith("(")).length})
+                      Keywords Found ({analysis.keywords.filter((k) => !k.startsWith("(") && !/^soft:/i.test(k)).length})
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {analysis.keywords.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
-                        {analysis.keywords.map((keyword, i) => (
-                          <motion.div key={keyword} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.03 }}>
-                            <Badge variant={keyword.startsWith("(") ? "secondary" : "success"}>{keyword}</Badge>
+                        {analysis.keywords.map((keyword, i) => {
+                          const isSoft = /^soft:/i.test(keyword);
+                          const display = isSoft ? keyword.replace(/^soft:\s*/i, "") : keyword;
+                          return (
+                          <motion.div key={`${keyword}-${i}`} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.03 }}>
+                            <Badge variant={keyword.startsWith("(") ? "secondary" : isSoft ? "default" : "success"}>{display}{isSoft ? " · soft skill" : ""}</Badge>
                           </motion.div>
-                        ))}
+                        );})}
                       </div>
                     ) : (
                       <div className="rounded-lg bg-yellow-50 p-3 text-center dark:bg-yellow-900/10">
@@ -671,6 +677,14 @@ export function ResumeAnalysisPage() {
                             initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, type: "spring" }}>
                             {hiringData.probability}%
                           </motion.span>
+                          <p className="mt-1 text-[10px] leading-snug text-gray-500 dark:text-gray-400">
+                            Interview readiness index (blended model — not the same as headline ATS).
+                            {resume?.atsScore != null && (
+                              <span className="mt-0.5 block font-medium text-gray-600 dark:text-gray-300">
+                                Headline ATS (same as top card): {canonicalAts}%
+                              </span>
+                            )}
+                          </p>
                           <p className="mt-1 text-xs text-gray-500">{hiringData.verdict}</p>
                         </div>
                         <div className="space-y-1.5">
@@ -701,6 +715,9 @@ export function ResumeAnalysisPage() {
                           <p className="text-xs text-gray-500">You beat</p>
                           <p className="text-3xl font-bold text-brand-600">{benchmarkData.beatsPercent}%</p>
                           <p className="text-xs font-medium text-brand-500">{benchmarkData.rank}</p>
+                          <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
+                            Percentile vs illustrative global peers — headline ATS remains {canonicalAts}% (top card).
+                          </p>
                         </div>
                         <div className="space-y-1.5">
                           {benchmarkData.sectionBenchmarks.map((s) => (
@@ -1057,7 +1074,7 @@ export function ResumeAnalysisPage() {
                     <div className="space-y-4">
                       {/* Overall — uses master ATS score as Single Source of Truth */}
                       <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-brand-50 to-purple-50 p-4 dark:from-brand-900/20 dark:to-purple-900/20">
-                        <span className="text-3xl font-bold text-brand-600">{resume?.atsScore ?? sectionData.overall}</span>
+                        <span className="text-3xl font-bold text-brand-600">{canonicalAts || sectionData.overall}</span>
                         <span className="text-sm text-gray-600 dark:text-gray-400">/100 Overall ATS Score</span>
                       </div>
 
@@ -1263,7 +1280,7 @@ export function ResumeAnalysisPage() {
                       generateAnalysisReport(
                         analysis,
                         resume.fileName,
-                        resume.atsScore || 0,
+                        canonicalAts,
                         user?.name || "User"
                       );
                       toast.success("PDF report downloaded!");

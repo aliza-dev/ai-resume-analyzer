@@ -57,7 +57,8 @@ export function MockInterviewPage() {
       const r = await resumeApi.evaluateAnswer(selectedResumeId, questions[currentIdx].question, answer);
       setEvaluation(r);
       setTotalScore((prev) => [...prev, r.score]);
-      toast.success(`Score: ${r.score}% — ${r.grade}`);
+      const s10 = r.scoreOutOf10 ?? Math.max(1, Math.min(10, Math.round(r.score / 10)));
+      toast.success(`Score: ${s10}/10 — ${r.grade}`);
     } catch { toast.error("Evaluation failed"); }
     finally { setIsEvaluating(false); }
   };
@@ -191,12 +192,23 @@ export function MockInterviewPage() {
                       <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-brand-50 to-purple-50 p-4 dark:from-brand-900/20 dark:to-purple-900/20">
                         <div>
                           <p className="text-xs text-gray-500">Your Score</p>
-                          <p className="text-3xl font-bold text-brand-600">{evaluation.score}%</p>
+                          <p className="text-3xl font-bold text-brand-600">
+                            {evaluation.scoreOutOf10 ?? Math.max(1, Math.min(10, Math.round(evaluation.score / 10)))}
+                            <span className="text-lg font-semibold text-gray-500">/10</span>
+                          </p>
+                          <p className="text-xs text-gray-500">≈ {evaluation.score}% on full scale</p>
                         </div>
                         <Badge variant={evaluation.score >= 70 ? "success" : evaluation.score >= 50 ? "warning" : "danger"} className="text-sm">
                           {evaluation.grade}
                         </Badge>
                       </div>
+
+                      {evaluation.starFeedback && (
+                        <div className="rounded-lg border border-brand-200 bg-white/80 p-3 text-xs leading-relaxed text-gray-800 dark:border-brand-800 dark:bg-gray-900/60 dark:text-gray-200">
+                          <p className="mb-1 font-semibold text-brand-700 dark:text-brand-300">STAR feedback</p>
+                          <p className="whitespace-pre-wrap">{evaluation.starFeedback}</p>
+                        </div>
+                      )}
 
                       {evaluation.strengths.length > 0 && (
                         <div className="space-y-1">

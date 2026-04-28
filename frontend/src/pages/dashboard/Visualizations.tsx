@@ -345,6 +345,20 @@ export function VisualizationsPage() {
         </motion.div>
       )}
 
+      {preview?.usedStoredResumeText && preview.fileAvailable && !isDemo && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm dark:border-sky-900/40 dark:bg-sky-900/10">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-sky-500" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-sky-900 dark:text-sky-100">Using saved resume text</p>
+              <p className="text-xs text-sky-800/90 dark:text-sky-200/90">
+                Highlights and soft-skill detection use the text stored from your last analysis (same text that was scored). Re-analyze after you change the PDF to refresh this copy.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Demo-mode banner */}
       {isDemo && preview && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>

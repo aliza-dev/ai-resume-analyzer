@@ -26,7 +26,8 @@
     "node": "20.x"
   },
   "overrides": {
-    "afinn-165": "1.0.4"
+    "afinn-165": "1.0.4",
+    "uuid": "9.0.1"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

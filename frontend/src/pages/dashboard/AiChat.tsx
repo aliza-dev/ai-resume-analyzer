@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { resumeApi } from "@/api/resume";
-import type { Resume } from "@/types";
+import type { Resume, ChatHistoryTurn } from "@/types";
 
 interface Message { role: "user" | "ai"; text: string }
 
@@ -42,10 +42,14 @@ export function AiChatPage() {
     const q = (text || input).trim();
     if (!q || !selectedResumeId) return;
     setInput("");
+    const historyForApi: ChatHistoryTurn[] = messages.slice(1).map((m) => ({
+      role: m.role === "user" ? "user" : "assistant",
+      content: m.text,
+    }));
     setMessages((prev) => [...prev, { role: "user", text: q }]);
     setIsLoading(true);
     try {
-      const res = await resumeApi.chat(selectedResumeId, q);
+      const res = await resumeApi.chat(selectedResumeId, q, historyForApi);
       setMessages((prev) => [...prev, { role: "ai", text: res.answer }]);
     } catch {
       setMessages((prev) => [...prev, { role: "ai", text: "Sorry, something went wrong. Please try again!" }]);

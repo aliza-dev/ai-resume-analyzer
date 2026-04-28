@@ -30,6 +30,7 @@ export interface Resume {
   userId: string;
   fileUrl: string;
   fileName: string;
+  /** Canonical headline ATS % — use everywhere vs. derived “readiness” metrics */
   atsScore: number | null;
   createdAt: string;
   analysis?: Analysis;
@@ -38,12 +39,14 @@ export interface Resume {
 export interface Analysis {
   id: string;
   resumeId: string;
+  /** Section scores 0–100; headline ATS lives on `Resume.atsScore`, not here */
   skillsScore: number;
   experienceScore: number;
   educationScore: number;
   projectsScore: number;
   jobMatchScore: number;
   suggestions: string[];
+  /** Technical + dynamic keywords; may include `Soft:Label` entries from AI analysis */
   keywords: string[];
   missingKeywords: string[];
   metrics?: {
@@ -195,6 +198,8 @@ export interface ResumePreview {
   fileAvailable?: boolean;
   /** True when the resume has no stored analysis yet — user should run Analysis first */
   needsAnalysis?: boolean;
+  /** Preview body was loaded from `storedResumeText` (last analyze) because the PDF was missing or too short */
+  usedStoredResumeText?: boolean;
 }
 
 export interface HiringProbability {
@@ -239,12 +244,19 @@ export interface ProjectSuggestion {
 }
 
 export interface AnswerEvaluation {
+  /** 0–100 scale (compatible with running averages); derived from scoreOutOf10 when using AI */
   score: number;
+  /** Primary display score for mock interview feedback */
+  scoreOutOf10?: number;
   grade: string;
   strengths: string[];
   feedback: string[];
   techMentioned: string[];
+  /** STAR-oriented coaching paragraph */
+  starFeedback?: string;
 }
+
+export type ChatHistoryTurn = { role: "user" | "assistant"; content: string };
 
 export interface ChatResponse {
   answer: string;

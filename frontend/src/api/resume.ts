@@ -1,5 +1,5 @@
 import apiClient from "./client";
-import type { Resume, Analysis, JobMatch, InterviewQuestionsResponse, SmartFeedbackResponse, SectionAnalysisResponse, RewriteResponse, GeneratedContent, ResumeComparison, IndustryDetection, ReadabilityResult, CareerGrowth, ProjectSuggestion, AnswerEvaluation, ChatResponse, HiringProbability, GlobalBenchmark, BadgesResponse, ResumePreview } from "@/types";
+import type { Resume, Analysis, JobMatch, InterviewQuestionsResponse, SmartFeedbackResponse, SectionAnalysisResponse, RewriteResponse, GeneratedContent, ResumeComparison, IndustryDetection, ReadabilityResult, CareerGrowth, ProjectSuggestion, AnswerEvaluation, ChatResponse, HiringProbability, GlobalBenchmark, BadgesResponse, ResumePreview, ChatHistoryTurn } from "@/types";
 
 export const resumeApi = {
   upload: async (file: File): Promise<Resume> => {
@@ -139,8 +139,8 @@ export const resumeApi = {
     return response.data;
   },
 
-  chat: async (resumeId: string, question: string): Promise<ChatResponse> => {
-    const response = await apiClient.post<ChatResponse>("/analysis/chat", { resumeId, question });
+  chat: async (resumeId: string, question: string, history?: ChatHistoryTurn[]): Promise<ChatResponse> => {
+    const response = await apiClient.post<ChatResponse>("/analysis/chat", { resumeId, question, history });
     return response.data;
   },
 
