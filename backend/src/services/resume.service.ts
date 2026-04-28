@@ -1,6 +1,7 @@
 import prisma from "../config/database";
 import fs from "fs";
 import path from "path";
+import { extractTextFromFile } from "./analysis.service";
 
 export class ResumeService {
   async upload(userId: string, file: Express.Multer.File) {
@@ -14,6 +15,25 @@ export class ResumeService {
         analysis: true,
       },
     });
+
+    // Persist extracted text immediately so analyze/preview work when the file path
+    // points to ephemeral storage (e.g. Vercel `/tmp` — a different invocation often has no file).
+    try {
+      const extracted = await extractTextFromFile(file.path);
+      if (extracted.trim()) {
+        await prisma.resume.update({
+          where: { id: resume.id },
+          data: { storedResumeText: extracted.slice(0, 500_000) },
+        });
+        const refreshed = await prisma.resume.findFirst({
+          where: { id: resume.id, userId },
+          include: { analysis: true },
+        });
+        if (refreshed) return refreshed;
+      }
+    } catch (err) {
+      console.error("[Resume upload] Text extraction failed (non-fatal):", err);
+    }
 
     return resume;
   }

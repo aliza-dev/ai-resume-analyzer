@@ -174,8 +174,9 @@ function normalizeResumeText(raw: string): string {
 
 /**
  * Extract text from PDF or DOCX with robust normalization
+ * (exported for upload pipeline — persists text so analyze works when /tmp is gone, e.g. Vercel)
  */
-async function extractTextFromFile(filePath: string): Promise<string> {
+export async function extractTextFromFile(filePath: string): Promise<string> {
   const resolvedPath = path.resolve(filePath);
   const ext = path.extname(resolvedPath).toLowerCase();
 
@@ -2033,6 +2034,29 @@ class AnalysisEngine {
 
 // ── Service ──────────────────────────────────────────────────────
 export class AnalysisService {
+  /**
+   * Read text from the uploaded file, preferring `storedResumeText` when the file is missing
+   * or yields less text (typical on Vercel: `/tmp` is not shared across serverless invocations).
+   */
+  private async _extractResumeTextPreferringStored(resume: {
+    fileUrl: string;
+    fileName: string;
+    storedResumeText: string | null;
+  }): Promise<string> {
+    let resumeText = await extractTextFromFile(resume.fileUrl);
+    const storedRaw = (resume.storedResumeText ?? "").trim();
+    const storedUsable = storedRaw.length > 0 && !looksLikeExtractionPlaceholder(storedRaw);
+    const fileW = countWords(resumeText);
+    const storedW = storedUsable ? countWords(storedRaw) : 0;
+    if (storedUsable && storedW > fileW) {
+      console.log(
+        `[Parser] Preferring storedResumeText (${storedW} words) over file extraction (${fileW} words) for "${resume.fileName}"`,
+      );
+      resumeText = storedRaw;
+    }
+    return resumeText;
+  }
+
   async analyzeResume(resumeId: string, userId: string) {
     const resume = await prisma.resume.findFirst({
       where: { id: resumeId, userId },
@@ -2041,12 +2065,13 @@ export class AnalysisService {
 
     if (!resume) throw new Error("Resume not found");
 
-    let resumeText = await extractTextFromFile(resume.fileUrl);
+    let resumeText = await this._extractResumeTextPreferringStored(resume);
 
     if (!resumeText.trim()) {
       throw new ClientError(
-        "Could not extract text from this PDF. It may be scanned, image-only, or password-protected. " +
-          "Export a text-based PDF from Word or Google Docs and try again.",
+        "Could not extract text from this resume. It may be scanned, image-only, or password-protected; " +
+          "export a text-based PDF or DOCX from Word or Google Docs and upload again. " +
+          "If you already uploaded a normal PDF, try uploading once more so the server can cache the extracted text.",
         422,
         "PARSING_FAILED",
       );
@@ -2236,7 +2261,7 @@ export class AnalysisService {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
 
-    const resumeText = await extractTextFromFile(resume.fileUrl);
+    const resumeText = await this._extractResumeTextPreferringStored(resume);
 
     // ── Pre-check: Does the JD actually contain technical skills? ──
     const jdLower = jobDescription.toLowerCase();
@@ -2312,7 +2337,7 @@ export class AnalysisService {
 
     const accountName = userRow?.name?.trim() || undefined;
 
-    let resumeText = await extractTextFromFile(resume.fileUrl);
+    let resumeText = await this._extractResumeTextPreferringStored(resume);
 
     // If extraction failed but we have stored analysis, build context from it
     const storedKeywords = resume.analysis?.keywords || [];
@@ -2429,12 +2454,7 @@ export class AnalysisService {
   async getResumeText(resumeId: string, userId: string): Promise<string> {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId } });
     if (!resume) throw new Error("Resume not found");
-    let t = await extractTextFromFile(resume.fileUrl);
-    const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
-    if (wordCount(t) < 20 && resume.storedResumeText && wordCount(resume.storedResumeText) >= 20) {
-      t = resume.storedResumeText;
-    }
-    return t;
+    return this._extractResumeTextPreferringStored(resume);
   }
 
   async getResumePreview(resumeId: string, userId: string) {
@@ -2449,7 +2469,7 @@ export class AnalysisService {
     // (fixes Vercel /tmp loss so highlights + soft skills still work without the PDF).
     let fileText = "";
     try {
-      fileText = (await extractTextFromFile(resume.fileUrl)).trim();
+      fileText = (await this._extractResumeTextPreferringStored(resume)).trim();
     } catch (err) {
       console.warn("[Preview] File extraction failed:", err);
     }
@@ -2695,7 +2715,7 @@ export class AnalysisService {
   async getBadges(resumeId: string, userId: string) {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId }, include: { analysis: true } });
     if (!resume) throw new Error("Resume not found");
-    const text = await extractTextFromFile(resume.fileUrl);
+    const text = await this._extractResumeTextPreferringStored(resume);
     const a = resume.analysis ? { skillsScore: resume.analysis.skillsScore, experienceScore: resume.analysis.experienceScore, educationScore: resume.analysis.educationScore, projectsScore: resume.analysis.projectsScore, keywords: resume.analysis.keywords, suggestions: resume.analysis.suggestions } : null;
     return AnalysisEngine.calculateBadges(text, resume.atsScore || 0, a);
   }
@@ -2703,7 +2723,7 @@ export class AnalysisService {
   async detectIndustry(resumeId: string, userId: string) {
     const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId } });
     if (!resume) throw new Error("Resume not found");
-    const resumeText = await extractTextFromFile(resume.fileUrl);
+    const resumeText = await this._extractResumeTextPreferringStored(resume);
 
     // Use NLP semantic classification (weighted cosine)
     const nlpClassification = classifyIndustry(resumeText);
@@ -2750,9 +2770,19 @@ export class AnalysisService {
    * (e.g., on Vercel where /tmp is ephemeral between serverless invocations)
    */
   private async _getResumeTextWithFallback(
-    resume: { fileUrl: string; fileName: string; atsScore?: number | null; analysis?: { keywords: string[]; missingKeywords: string[]; suggestions: string[]; skillsScore: number; experienceScore: number; educationScore: number; projectsScore: number } | null },
+    resume: {
+      fileUrl: string;
+      fileName: string;
+      storedResumeText?: string | null;
+      atsScore?: number | null;
+      analysis?: { keywords: string[]; missingKeywords: string[]; suggestions: string[]; skillsScore: number; experienceScore: number; educationScore: number; projectsScore: number } | null;
+    },
   ): Promise<string> {
-    let text = await extractTextFromFile(resume.fileUrl);
+    let text = await this._extractResumeTextPreferringStored({
+      fileUrl: resume.fileUrl,
+      fileName: resume.fileName,
+      storedResumeText: resume.storedResumeText ?? null,
+    });
 
     // If we got meaningful text from the file, return it
     if (text.trim() && text.split(/\s+/).length >= 20) {
